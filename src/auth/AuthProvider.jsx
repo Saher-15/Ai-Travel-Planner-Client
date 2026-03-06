@@ -10,7 +10,7 @@ export function AuthProvider({ children }) {
   async function refresh() {
     setLoading(true);
     try {
-      const { data } = await api.get("/auth/me");
+      const { data } = await api.get("/auth/me", { withCredentials: true });
       const u = data?.user || null;
 
       if (u) setUser(normalizeUser(u));

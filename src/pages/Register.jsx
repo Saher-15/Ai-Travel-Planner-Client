@@ -47,7 +47,8 @@ export default function Register() {
         email,
         password,
         confirmPassword,
-      });
+      }, { withCredentials: false });
+
 
       setOk("Account created. You can login now.");
       setTimeout(() => nav("/login"), 600);

@@ -18,7 +18,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await api.post("/auth/login", { email, password });
+await api.post("/auth/login", { email, password }, { withCredentials: true });
 
       // Refresh user state
       await refresh();
