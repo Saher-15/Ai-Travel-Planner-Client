@@ -42,12 +42,14 @@ export default function App() {
 
           <Route path="/contact" element={<Contact />} />
 
+          {/* profile is now PUBLIC (or at least not blocked for unverified users) */}
+          <Route path="/profile" element={<Profile />} />
+
           {/* protected */}
           <Route path="/create" element={<P><CreateTrip /></P>} />
           <Route path="/result" element={<P><TripResult /></P>} />
           <Route path="/trips" element={<P><MyTrips /></P>} />
           <Route path="/trip/:id" element={<P><ViewTrip /></P>} />
-          <Route path="/profile" element={<P><Profile /></P>} />
 
           {/* fallback */}
           <Route
