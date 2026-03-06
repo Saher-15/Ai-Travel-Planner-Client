@@ -6,9 +6,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      // frontend calls /api/... -> backend http://localhost:5050/...
       "/api": {
-        target: "http://localhost:5050",
+        target: "https://ai-travel-planner-server.onrender.com",
         changeOrigin: true,
         secure: false,
       },
