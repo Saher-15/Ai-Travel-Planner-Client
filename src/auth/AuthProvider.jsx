@@ -15,7 +15,11 @@ export function AuthProvider({ children }) {
 
       if (u) setUser(normalizeUser(u));
       else setUser(null);
-    } catch {
+    } catch (err) {
+      // Ignore 401 (user not logged in yet)
+      if (err.response?.status !== 401) {
+        console.error("Auth error:", err);
+      }
       setUser(null);
     } finally {
       setLoading(false);
@@ -24,7 +28,7 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     try {
-      await api.post("/auth/logout");
+      await api.post("/auth/logout", null, { withCredentials: true });
     } finally {
       setUser(null);
     }
@@ -57,7 +61,6 @@ function normalizeUser(u) {
     verified: Boolean(u.verified),
   };
 }
-
 
 export function useAuth() {
   const ctx = useContext(AuthCtx);
