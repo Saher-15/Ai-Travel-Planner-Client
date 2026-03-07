@@ -23,6 +23,16 @@ const interestOptions = [
   "family",
 ];
 
+const eventTypeOptions = [
+  "festival",
+  "concert",
+  "culture",
+  "nightlife",
+  "food",
+  "family",
+  "sports",
+];
+
 const quickTemplates = [
   {
     title: "City Explorer",
@@ -86,6 +96,8 @@ export default function CreateTrip() {
   const [budget, setBudget] = useState("mid");
   const [interests, setInterests] = useState([]);
   const [notes, setNotes] = useState("");
+  const [includeEvents, setIncludeEvents] = useState(true);
+  const [eventTypes, setEventTypes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -154,11 +166,18 @@ export default function CreateTrip() {
     let summary = `A ${pace} ${daysCount || ""}-day trip to ${destination.trim()}`;
     if (budget) summary += ` with a ${budget} budget`;
     if (travelers) summary += ` for ${formatTravelersLabel(travelers).toLowerCase()}`;
+    if (includeEvents) summary += " including local events";
     return summary;
-  }, [destination, pace, daysCount, budget, travelers]);
+  }, [destination, pace, daysCount, budget, travelers, includeEvents]);
 
   function toggleInterest(x) {
     setInterests((prev) =>
+      prev.includes(x) ? prev.filter((i) => i !== x) : [...prev, x]
+    );
+  }
+
+  function toggleEventType(x) {
+    setEventTypes((prev) =>
       prev.includes(x) ? prev.filter((i) => i !== x) : [...prev, x]
     );
   }
@@ -178,6 +197,8 @@ export default function CreateTrip() {
     setBudget("mid");
     setInterests([]);
     setNotes("");
+    setIncludeEvents(true);
+    setEventTypes([]);
     setErr("");
   }
 
@@ -219,6 +240,8 @@ export default function CreateTrip() {
           sourceTab,
           tripType,
           from,
+          includeEvents,
+          eventTypes,
         },
       });
 
@@ -232,7 +255,6 @@ export default function CreateTrip() {
 
   return (
     <div className="space-y-6">
-      {/* Top banner */}
       <Card className="overflow-hidden border-slate-200 shadow-[0_24px_80px_-30px_rgba(15,23,42,0.25)]">
         <div className="bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-700 p-6 text-white sm:p-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -281,13 +303,18 @@ export default function CreateTrip() {
                   {tripType}
                 </Badge>
               ) : null}
+
+              {includeEvents ? (
+                <Badge className="border-white/20 bg-white/10 text-white">
+                  Events on
+                </Badge>
+              ) : null}
             </div>
           </div>
         </div>
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left */}
         <div className="space-y-6 lg:col-span-5">
           <Card>
             <CardHeader
@@ -384,6 +411,61 @@ export default function CreateTrip() {
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800">
+                        Events during your trip
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Discover local festivals, parties, concerts, and more on your selected dates.
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIncludeEvents((prev) => !prev)}
+                      className={[
+                        "rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                        includeEvents
+                          ? "bg-sky-600 text-white"
+                          : "bg-slate-200 text-slate-700",
+                      ].join(" ")}
+                    >
+                      {includeEvents ? "Enabled" : "Disabled"}
+                    </button>
+                  </div>
+
+                  {includeEvents ? (
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Event types
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {eventTypeOptions.map((x) => {
+                          const active = eventTypes.includes(x);
+
+                          return (
+                            <button
+                              type="button"
+                              key={x}
+                              onClick={() => toggleEventType(x)}
+                              className={[
+                                "rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition",
+                                active
+                                  ? "border-indigo-600 bg-indigo-600 text-white"
+                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                              ].join(" ")}
+                            >
+                              {x}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
                 <label className="block">
                   <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
                     <span>Notes (optional)</span>
@@ -471,7 +553,6 @@ export default function CreateTrip() {
           </Card>
         </div>
 
-        {/* Right */}
         <div className="space-y-6 lg:col-span-7">
           <Card className="overflow-hidden">
             <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-white">
@@ -499,6 +580,12 @@ export default function CreateTrip() {
                       {formatTravelersLabel(travelers)}
                     </span>
                   ) : null}
+
+                  {includeEvents ? (
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
+                      local events
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
@@ -511,6 +598,16 @@ export default function CreateTrip() {
                     {x}
                   </span>
                 ))}
+
+                {includeEvents &&
+                  eventTypes.slice(0, 4).map((x) => (
+                    <span
+                      key={`event-${x}`}
+                      className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold capitalize"
+                    >
+                      {x}
+                    </span>
+                  ))}
               </div>
             </div>
 
@@ -535,6 +632,13 @@ export default function CreateTrip() {
                   {tripType ? <MiniInfo label="Trip type" value={tripType} /> : null}
                 </div>
               )}
+
+              {includeEvents ? (
+                <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-slate-600">
+                  <div className="mb-1 font-semibold text-slate-800">Events enabled</div>
+                  Your trip will also try to include local happenings for the selected date range.
+                </div>
+              ) : null}
 
               {notes.trim() && (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">

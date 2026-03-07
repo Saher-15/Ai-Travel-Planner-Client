@@ -86,6 +86,7 @@ function normalizeTripForForm(trip) {
         backupPlan: day?.backupPlan || "",
       })),
     },
+    events: safeArray(trip?.events),
   };
 }
 
@@ -237,6 +238,7 @@ export default function EditTrip() {
           recommendedPlaces: safeArray(form.itinerary.recommendedPlaces),
           days: safeArray(form.itinerary.days),
         },
+        events: safeArray(form.events),
       });
 
       setSuccess("Trip updated successfully.");
@@ -368,6 +370,10 @@ export default function EditTrip() {
                 <MiniInfo
                   label="Tips"
                   value={safeArray(form?.itinerary?.tips).length}
+                />
+                <MiniInfo
+                  label="Events"
+                  value={safeArray(form?.events).length}
                 />
               </CardBody>
             </Card>

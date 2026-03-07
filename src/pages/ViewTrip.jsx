@@ -374,6 +374,8 @@ export default function ViewTrip() {
           destination={trip?.destination}
         />
 
+        <EventsSection events={trip?.events || []} />
+
         <div className="grid gap-6 lg:grid-cols-2">
           {trip?.itinerary?.days?.map((d) => (
             <DayCard key={d.day} day={d} />
@@ -528,6 +530,11 @@ function Header({ trip, summary, onBack, onNew, onEdit, onDownload }) {
                 budget: {summary.budget}
               </Badge>
             ) : null}
+            {!!trip?.events?.length ? (
+              <Badge className="border-white/20 bg-white/10 text-white">
+                {trip.events.length} events
+              </Badge>
+            ) : null}
           </div>
         </div>
 
@@ -620,6 +627,96 @@ function TripOverview({ trip, summary }) {
   );
 }
 
+function EventsSection({ events }) {
+  if (!events?.length) return null;
+
+  const grouped = events.reduce((acc, event) => {
+    const key = event?.date || "Unknown date";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(event);
+    return acc;
+  }, {});
+
+  const orderedDates = Object.keys(grouped).sort();
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Events During Your Trip"
+        subtitle="Local events, parties, concerts, and activities matching your trip dates"
+        right={<Badge>{events.length} events</Badge>}
+      />
+      <CardBody className="space-y-5">
+        {orderedDates.map((dateKey) => (
+          <div key={dateKey}>
+            <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+              {dateKey}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {grouped[dateKey].map((event, i) => (
+                <div
+                  key={`${event.name}-${event.date}-${i}`}
+                  className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-sm font-bold text-slate-900">
+                      {event.name || "Event"}
+                    </div>
+
+                    {event.category ? (
+                      <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+                        {event.category}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-2 text-xs text-slate-500">
+                    {event.time || "Time not specified"}
+                  </div>
+
+                  {event.location ? (
+                    <div className="mt-2 text-sm font-medium text-slate-700">
+                      {event.location}
+                    </div>
+                  ) : null}
+
+                  {event.description ? (
+                    <div className="mt-3 text-sm leading-6 text-slate-600">
+                      {event.description}
+                    </div>
+                  ) : null}
+
+                  {(event.source || event.link) ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {event.source ? (
+                        <span className="text-xs text-slate-500">
+                          {event.source}
+                        </span>
+                      ) : null}
+
+                      {event.link ? (
+                        <a
+                          href={event.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-sky-700 hover:text-sky-800"
+                        >
+                          View event
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
+
 function WeatherSection({ state, destination }) {
   if (state.loading) {
     return (
@@ -703,7 +800,8 @@ function WeatherSection({ state, destination }) {
             </div>
           </div>
 
-<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">            {days.slice(0, 7).map((item, i) => (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {days.slice(0, 7).map((item, i) => (
               <div
                 key={`${item.date}-${i}`}
                 className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
