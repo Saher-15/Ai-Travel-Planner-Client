@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
+import { Button } from "../components/UI.jsx";
 
 const cx = (...c) => c.filter(Boolean).join(" ");
 
@@ -9,10 +10,10 @@ function NavItem({ to, onClick, children, mobile = false }) {
     ? "flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold transition"
     : "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition";
 
-  const idle = "text-slate-700 hover:bg-slate-100";
+  const idle = "text-slate-700 hover:bg-sky-50 hover:text-sky-700";
   const active = mobile
-    ? "bg-slate-900 text-white shadow-sm"
-    : "bg-slate-900 text-white shadow-sm hover:bg-slate-900";
+    ? "bg-sky-600 text-white shadow-sm"
+    : "bg-sky-600 text-white shadow-sm hover:bg-sky-600";
 
   if (onClick) {
     return (
@@ -31,23 +32,25 @@ function NavItem({ to, onClick, children, mobile = false }) {
 
 function Brand() {
   return (
-    <Link to="/" className="group flex items-center gap-3">
+    <Link to="/" className="group flex min-w-0 items-center gap-3">
       <div
         className={cx(
-          "grid h-11 w-11 place-items-center rounded-2xl",
-          "bg-linear-to-br from-slate-950 via-slate-800 to-slate-700 text-white",
-          "shadow-[0_10px_30px_-12px_rgba(15,23,42,0.45)] ring-1 ring-slate-900/10",
+          "grid h-11 w-11 shrink-0 place-items-center rounded-2xl",
+          "bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white",
+          "shadow-[0_10px_30px_-12px_rgba(37,99,235,0.45)] ring-1 ring-sky-900/10",
           "transition duration-300 group-hover:scale-[1.03]"
         )}
       >
         <span className="text-sm font-extrabold tracking-tight">TP</span>
       </div>
 
-      <div className="leading-tight">
-        <div className="text-base font-black tracking-tight text-slate-900">
+      <div className="min-w-0 leading-tight">
+        <div className="truncate text-base font-black tracking-tight text-slate-900">
           Travel Planner
         </div>
-        <div className="text-xs text-slate-500">AI-powered trip generation</div>
+        <div className="truncate text-xs text-slate-500">
+          Smart trip planning made easy
+        </div>
       </div>
     </Link>
   );
@@ -86,12 +89,29 @@ function MobileMenuButton({ open, onClick }) {
   );
 }
 
+function UserPill({ user }) {
+  return (
+    <div className="hidden xl:flex items-center gap-2 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">
+        {(user?.name || "T").trim().charAt(0).toUpperCase()}
+      </span>
+      <span className="max-w-[140px] truncate">Welcome, {user?.name || "Traveler"}</span>
+    </div>
+  );
+}
+
 export default function Layout({ children }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoggedIn, user, logout } = useAuth();
+
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const closeMobileMenu = () => setMobileOpen(false);
+
+  useEffect(() => {
+    closeMobileMenu();
+  }, [location.pathname]);
 
   const onLogout = async () => {
     closeMobileMenu();
@@ -100,125 +120,122 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-slate-50 via-white to-slate-100">
-      {/* HEADER */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <Brand />
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-slate-100">
+      {/* GLOBAL HEADER */}
+      <header className="sticky top-0 z-[200] border-b border-slate-200/70 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/75">
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
+          <div className="flex items-center justify-between gap-4">
+            <Brand />
 
-          {/* DESKTOP NAV */}
-          <div className="hidden md:flex items-center gap-3">
-            <nav className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white/90 p-1.5 shadow-sm">
+            {/* DESKTOP NAV */}
+            <div className="hidden items-center gap-3 md:flex">
+              <nav className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white/90 p-1.5 shadow-sm">
+                {isLoggedIn ? (
+                  <>
+                    <NavItem to="/">Home</NavItem>
+                    <NavItem to="/create">Create Trip</NavItem>
+                    <NavItem to="/trips">My Trips</NavItem>
+                    <NavItem to="/contact">Contact</NavItem>
+                    <NavItem to="/profile">Profile</NavItem>
+                  </>
+                ) : (
+                  <>
+                    <NavItem to="/">Home</NavItem>
+                    <NavItem to="/contact">Contact</NavItem>
+                    <NavItem to="/login">Login</NavItem>
+                    <NavItem to="/register">Register</NavItem>
+                  </>
+                )}
+              </nav>
+
               {isLoggedIn ? (
-                <>
-                  <NavItem to="/">Home</NavItem>
-                  <NavItem to="/contact">Contact</NavItem>
-                  <NavItem to="/create">Create</NavItem>
-                  <NavItem to="/trips">My Trips</NavItem>
-                  <NavItem to="/profile">Profile</NavItem>
-                </>
-              ) : (
-                <>
-                  <NavItem to="/">Home</NavItem>
-                  <NavItem to="/contact">Contact</NavItem>
-                  <NavItem to="/login">Login</NavItem>
-                  <NavItem to="/register">Register</NavItem>
-                </>
-              )}
-            </nav>
-
-            {isLoggedIn && (
-              <div className="flex items-center gap-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
-                  Welcome, {user?.name || "Traveler"} 👋
+                <div className="flex items-center gap-2">
+                  <UserPill user={user} />
+                  <Button variant="secondary" onClick={onLogout}>
+                    Logout
+                  </Button>
                 </div>
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+              ) : (
+                <Link
+                  to="/create"
+                  className="inline-flex items-center justify-center rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-500 hover:shadow-md"
                 >
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
+                  Plan a Trip
+                </Link>
+              )}
+            </div>
 
-          {/* MOBILE TOGGLE */}
-          <MobileMenuButton open={mobileOpen} onClick={() => setMobileOpen((v) => !v)} />
+            {/* MOBILE TOGGLE */}
+            <MobileMenuButton open={mobileOpen} onClick={() => setMobileOpen((v) => !v)} />
+          </div>
         </div>
 
-        {/* MOBILE DROPDOWN */}
+        {/* MOBILE MENU */}
         <div
           className={cx(
             "overflow-hidden border-t border-slate-200 bg-white/95 backdrop-blur-xl transition-all duration-300 md:hidden",
-            mobileOpen ? "max-h-130 opacity-100" : "max-h-0 opacity-0"
+            mobileOpen ? "max-h-[700px] opacity-100" : "max-h-0 opacity-0"
           )}
         >
-          <div className="space-y-3 px-4 py-4">
+          <div className="mx-auto max-w-7xl space-y-3 px-4 py-4 sm:px-6">
             {isLoggedIn && (
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
+              <div className="rounded-3xl border border-sky-100 bg-sky-50 px-4 py-3 shadow-sm">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Signed in
                 </div>
                 <div className="mt-1 text-sm font-bold text-slate-900">
                   Welcome, {user?.name || "Traveler"} 👋
                 </div>
+                {user?.email ? (
+                  <div className="mt-1 text-xs text-slate-500">{user.email}</div>
+                ) : null}
               </div>
             )}
 
             <nav className="grid gap-2">
               {isLoggedIn ? (
                 <>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/" mobile>
-                      Home
-                    </NavItem>
-                  </div>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/contact" mobile>
-                      Contact
-                    </NavItem>
-                  </div>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/create" mobile>
-                      Create
-                    </NavItem>
-                  </div>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/trips" mobile>
-                      My Trips
-                    </NavItem>
-                  </div>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/profile" mobile>
-                      Profile
-                    </NavItem>
-                  </div>
+                  <NavItem to="/" mobile>
+                    Home
+                  </NavItem>
+                  <NavItem to="/create" mobile>
+                    Create Trip
+                  </NavItem>
+                  <NavItem to="/trips" mobile>
+                    My Trips
+                  </NavItem>
+                  <NavItem to="/contact" mobile>
+                    Contact
+                  </NavItem>
+                  <NavItem to="/profile" mobile>
+                    Profile
+                  </NavItem>
                   <NavItem onClick={onLogout} mobile>
                     Logout
                   </NavItem>
                 </>
               ) : (
                 <>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/" mobile>
-                      Home
-                    </NavItem>
-                  </div>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/contact" mobile>
-                      Contact
-                    </NavItem>
-                  </div>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/login" mobile>
-                      Login
-                    </NavItem>
-                  </div>
-                  <div onClick={closeMobileMenu}>
-                    <NavItem to="/register" mobile>
-                      Register
-                    </NavItem>
+                  <NavItem to="/" mobile>
+                    Home
+                  </NavItem>
+                  <NavItem to="/contact" mobile>
+                    Contact
+                  </NavItem>
+                  <NavItem to="/login" mobile>
+                    Login
+                  </NavItem>
+                  <NavItem to="/register" mobile>
+                    Register
+                  </NavItem>
+
+                  <div className="pt-2">
+                    <Link
+                      to="/create"
+                      className="inline-flex w-full items-center justify-center rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500"
+                    >
+                      Plan a Trip
+                    </Link>
                   </div>
                 </>
               )}
@@ -229,8 +246,8 @@ export default function Layout({ children }) {
 
       {/* EMAIL VERIFICATION BANNER */}
       {isLoggedIn && user && !user.verified && (
-        <div className="border-b border-amber-300 bg-linear-to-r from-amber-50 to-yellow-50">
-          <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-3 text-center text-sm font-semibold text-amber-800">
+        <div className="relative z-[190] border-b border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50">
+          <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-3 text-center text-sm font-semibold text-amber-800 sm:px-6">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-xs">
               !
             </span>
@@ -244,7 +261,7 @@ export default function Layout({ children }) {
         </div>
       )}
 
-      {/* MAIN CONTENT */}
+      {/* PAGE WRAPPER */}
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-6">{children}</main>
     </div>
   );

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet-routing-machine";
 import "leaflet/dist/leaflet.css";
 
-// Fix default Leaflet marker icons (important for many bundlers)
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -16,7 +15,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-/** Jerusalem fallback */
 const DEFAULT_CENTER = [31.7683, 35.2137];
 const DEFAULT_ZOOM = 13;
 
@@ -30,11 +28,33 @@ function isValidPoint(p) {
   );
 }
 
-/**
- * Adds a Leaflet Routing Machine control.
- * IMPORTANT: This draws a route ONLY between your given points.
- * It does NOT add any extra markers/places.
- */
+function createNumberedIcon(index) {
+  return L.divIcon({
+    className: "custom-numbered-marker",
+    html: `
+      <div style="
+        width: 34px;
+        height: 34px;
+        border-radius: 9999px;
+        background: linear-gradient(135deg, #0284c7, #2563eb);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 800;
+        border: 2px solid white;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.25);
+      ">
+        ${index + 1}
+      </div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -16],
+  });
+}
+
 function RouteControl({ points }) {
   const map = useMap();
   const controlRef = useRef(null);
@@ -48,29 +68,27 @@ function RouteControl({ points }) {
   useEffect(() => {
     if (!map) return;
 
-    let cancelled = false;
-
-    const safeRemove = () => {
-      const ctrl = controlRef.current;
-      if (!ctrl) return;
+    const removeControlSafely = () => {
+      if (!controlRef.current) return;
 
       try {
-        // try to clear route first (reduces removeLayer null crashes)
-        if (ctrl.getPlan) {
+        if (controlRef.current.getPlan) {
           try {
-            ctrl.getPlan().setWaypoints([]);
+            controlRef.current.getPlan().setWaypoints([]);
           } catch {}
         }
-        map.removeControl(ctrl);
+
+        map.removeControl(controlRef.current);
       } catch {}
+
       controlRef.current = null;
     };
 
-    // Remove previous control
-    safeRemove();
+    removeControlSafely();
 
-    // Add route only if 2+ points
-    if (waypoints.length < 2) return () => {};
+    if (waypoints.length < 2) {
+      return () => removeControlSafely();
+    }
 
     const control = L.Routing.control({
       waypoints,
@@ -80,26 +98,33 @@ function RouteControl({ points }) {
       show: false,
       routeWhileDragging: false,
       createMarker: () => null,
+      lineOptions: {
+        styles: [
+          {
+            color: "#0ea5e9",
+            opacity: 0.9,
+            weight: 5,
+          },
+        ],
+        extendToWaypoints: true,
+        missingRouteTolerance: 0,
+      },
     });
 
     controlRef.current = control;
 
     try {
-      if (!cancelled) control.addTo(map);
+      control.addTo(map);
     } catch {}
 
     return () => {
-      cancelled = true;
-      safeRemove();
+      removeControlSafely();
     };
   }, [map, waypoints]);
 
   return null;
 }
 
-/**
- * Fits map view to the provided points.
- */
 function FitBounds({ points }) {
   const map = useMap();
 
@@ -113,34 +138,43 @@ function FitBounds({ points }) {
       return;
     }
 
+    if (valid.length === 1) {
+      map.setView([Number(valid[0].lat), Number(valid[0].lon)], 14);
+      return;
+    }
+
     const latLngs = valid.map((p) => [Number(p.lat), Number(p.lon)]);
     const bounds = L.latLngBounds(latLngs);
 
-    map.fitBounds(bounds, { padding: [30, 30] });
+    map.fitBounds(bounds, { padding: [40, 40] });
   }, [map, valid]);
 
   return null;
 }
 
 export default function TripRouteMap({ points }) {
-  const validPoints = useMemo(() => (points ?? []).filter(isValidPoint), [points]);
+  const validPoints = useMemo(() => {
+    return (points ?? []).filter(isValidPoint);
+  }, [points]);
 
   const initialCenter = useMemo(() => {
-    if (validPoints.length) return [Number(validPoints[0].lat), Number(validPoints[0].lon)];
+    if (validPoints.length) {
+      return [Number(validPoints[0].lat), Number(validPoints[0].lon)];
+    }
     return DEFAULT_CENTER;
   }, [validPoints]);
 
   return (
-    // ✅ This class lets you control Leaflet z-index safely if needed
     <div className="trip-route-map" style={{ height: 420, width: "100%" }}>
       <MapContainer
         center={initialCenter}
         zoom={DEFAULT_ZOOM}
         style={{ height: "100%", width: "100%" }}
+        scrollWheelZoom={true}
       >
         <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
 
         <FitBounds points={validPoints} />
@@ -150,25 +184,40 @@ export default function TripRouteMap({ points }) {
           <Marker
             key={`${p.location || p.title || "p"}-${p.day}-${p.timeBlock}-${idx}`}
             position={[Number(p.lat), Number(p.lon)]}
+            icon={createNumberedIcon(idx)}
           >
             <Popup>
-              <div style={{ maxWidth: 240 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>
+              <div style={{ maxWidth: 250 }}>
+                <div
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 15,
+                    color: "#0f172a",
+                    marginBottom: 6,
+                  }}
+                >
                   {p.title || p.displayName || "Place"}
                 </div>
 
                 {p.location ? (
-                  <div style={{ fontSize: 12, opacity: 0.85 }}>{p.location}</div>
+                  <div style={{ fontSize: 12, color: "#475569" }}>{p.location}</div>
                 ) : null}
 
                 {p.displayName && p.displayName !== p.location ? (
-                  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
                     {p.displayName}
                   </div>
                 ) : null}
 
                 {p.day || p.timeBlock ? (
-                  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#64748b",
+                      marginTop: 8,
+                      fontWeight: 600,
+                    }}
+                  >
                     {p.day ? `Day ${p.day}` : ""}
                     {p.day && p.timeBlock ? " • " : ""}
                     {p.timeBlock || ""}
@@ -181,7 +230,7 @@ export default function TripRouteMap({ points }) {
                     alt={p.title || p.location || "place"}
                     style={{
                       marginTop: 10,
-                      borderRadius: 10,
+                      borderRadius: 12,
                       width: "100%",
                       height: 120,
                       objectFit: "cover",

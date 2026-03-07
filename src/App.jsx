@@ -9,6 +9,7 @@ import CreateTrip from "./pages/CreateTrip.jsx";
 import TripResult from "./pages/TripResult.jsx";
 import MyTrips from "./pages/MyTrips.jsx";
 import ViewTrip from "./pages/ViewTrip.jsx";
+import EditTrip from "./pages/EditTrip.jsx";
 
 import Contact from "./pages/Contact.jsx";
 import Profile from "./pages/Profile.jsx";
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/result" element={<P><TripResult /></P>} />
           <Route path="/trips" element={<P><MyTrips /></P>} />
           <Route path="/trip/:id" element={<P><ViewTrip /></P>} />
+          <Route path="/trip/:id/edit" element={<P><EditTrip /></P>} />
 
           {/* fallback */}
           <Route

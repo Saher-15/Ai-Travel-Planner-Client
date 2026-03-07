@@ -58,12 +58,13 @@ function useAsync(fn, deps) {
         const data = await fn();
         if (alive) setState({ data, loading: false, error: "" });
       } catch (e) {
-        if (alive)
+        if (alive) {
           setState({
             data: null,
             loading: false,
             error: e?.response?.data?.message || "Something went wrong",
           });
+        }
       }
     })();
 
@@ -96,7 +97,9 @@ function useGeoPoints(locations) {
     async function retrySingle(forcedQuery) {
       const { data } = await api.post("/geocode/batch", { queries: [forcedQuery] });
       const r = Array.isArray(data?.results) ? data.results[0] : null;
-      return r && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lon)) ? r : null;
+      return r && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lon))
+        ? r
+        : null;
     }
 
     for (const p of locations) {
@@ -155,7 +158,12 @@ function useGeoPoints(locations) {
           wikipedia: detail?.wikipedia ?? null,
         });
       } catch {
-        points.push({ ...p, lat, lon, displayName: hit?.display_name ?? null });
+        points.push({
+          ...p,
+          lat,
+          lon,
+          displayName: hit?.display_name ?? null,
+        });
       }
     }
 
@@ -171,28 +179,27 @@ export default function ViewTrip() {
   const trip = tripState.data;
   const summary = trip?.itinerary?.tripSummary || {};
 
-  // ✅ PDF ref should wrap ONLY the printable content (NOT the Leaflet map)
   const pdfRef = useRef(null);
 
   const downloadPDF = async () => {
-  const res = await api.get(`/trips/${id}/pdf`, { responseType: "blob" });
-  const blob = new Blob([res.data], { type: "application/pdf" });
-  const url = window.URL.createObjectURL(blob);
+    const res = await api.get(`/trips/${id}/pdf`, { responseType: "blob" });
+    const blob = new Blob([res.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
 
-  const safeName = (trip?.destination || "planner")
-    .toString()
-    .replace(/[^\w\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
+    const safeName = (trip?.destination || "planner")
+      .toString()
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `trip-${safeName}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
-};
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `trip-${safeName}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
   const locations = useMemo(() => extractUniqueLocations(trip?.itinerary), [trip]);
   const examples = useMemo(() => locations.slice(0, 3).map((x) => x.location), [locations]);
@@ -203,51 +210,68 @@ export default function ViewTrip() {
 
   if (tripState.loading) return <TripSkeleton />;
 
-  if (tripState.error)
+  if (tripState.error) {
     return (
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="mx-auto max-w-2xl space-y-4">
         <Alert type="error">{tripState.error}</Alert>
         <div className="flex gap-2">
-          <Button onClick={() => nav("/trips")} variant="secondary">Back</Button>
-          <Button onClick={() => nav("/create")} variant="ghost">Create New</Button>
+          <Button onClick={() => nav("/trips")} variant="secondary">
+            Back
+          </Button>
+          <Button onClick={() => nav("/create")} variant="ghost">
+            Create New
+          </Button>
         </div>
       </div>
     );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* ✅ PDF AREA (Header + itinerary + tips only) */}
+    <div className="mx-auto max-w-6xl space-y-6">
       <div ref={pdfRef} className="space-y-6">
         <Header
           trip={trip}
           summary={summary}
           onBack={() => nav("/trips")}
           onNew={() => nav("/create")}
+          onEdit={() => nav(`/trip/${id}/edit`)}
           onDownload={downloadPDF}
         />
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        <TripOverview trip={trip} summary={summary} />
+
+        <div className="grid gap-6 lg:grid-cols-2">
           {trip?.itinerary?.days?.map((d) => (
             <DayCard key={d.day} day={d} />
           ))}
         </div>
 
         {!!trip?.itinerary?.tips?.length && (
-          <Card>
-            <CardHeader title="Tips" subtitle="Helpful reminders" />
+          <Card className="overflow-hidden">
+            <CardHeader
+              title="Trip Tips"
+              subtitle="Helpful reminders for a smoother travel experience"
+            />
             <CardBody>
-              <ul className="list-disc pl-5 space-y-2 text-sm text-slate-700">
-                {trip.itinerary.tips.map((t, i) => <li key={i}>{t}</li>)}
-              </ul>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {trip.itinerary.tips.map((t, i) => (
+                  <div
+                    key={i}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700"
+                  >
+                    {t}
+                  </div>
+                ))}
+              </div>
             </CardBody>
           </Card>
         )}
       </div>
 
-      {/* ✅ LIVE MAP OUTSIDE PDF AREA (prevents Leaflet overlays stealing clicks + avoids export issues) */}
-      <Card className="overflow-hidden relative z-0">
-        <CardHeader title="Map" subtitle="Places + route from your itinerary" />
-        <CardBody className="space-y-3">
+      <Card className="relative z-0 overflow-hidden">
+        <CardHeader title="Destination Map" subtitle="Places and route from your itinerary" />
+
+        <CardBody className="space-y-4">
           {geoState.error ? <Alert type="error">{geoState.error}</Alert> : null}
 
           {geoState.loading ? (
@@ -256,44 +280,58 @@ export default function ViewTrip() {
             <NiceEmptyState
               title="No map locations found"
               subtitle="This saved itinerary doesn’t include activity location fields."
-              action={<Button onClick={() => nav("/create")} variant="secondary">Create a new trip</Button>}
+              action={
+                <Button onClick={() => nav("/create")} variant="secondary">
+                  Create a new trip
+                </Button>
+              }
             />
           ) : mapPoints.length === 0 ? (
             <NiceEmptyState
               title="We couldn’t geocode your locations"
               subtitle={
                 <>
-                  Found <b>{locations.length}</b> location strings, but got <b>0</b> coordinates back.
+                  Found <b>{locations.length}</b> location strings, but got <b>0</b>{" "}
+                  coordinates back.
                 </>
               }
               hint={
                 <div className="space-y-2">
-                  <div className="text-xs text-slate-500 wrap-break-word">
+                  <div className="break-words text-xs text-slate-500">
                     Example queries: {examples.join(" | ")}
                   </div>
                   {geoFailed.length ? (
-                    <div className="text-xs text-slate-500 wrap-break-word">
-                      Failed examples: {geoFailed.slice(0, 3).map((x) => `${x.q} (${x.reason})`).join(" | ")}
+                    <div className="break-words text-xs text-slate-500">
+                      Failed examples:{" "}
+                      {geoFailed
+                        .slice(0, 3)
+                        .map((x) => `${x.q} (${x.reason})`)
+                        .join(" | ")}
                     </div>
                   ) : null}
                 </div>
               }
               action={
-                <div className="flex gap-2 flex-wrap">
-                  <Button onClick={() => window.location.reload()} variant="secondary">Retry</Button>
-                  <Button onClick={() => nav("/create")} variant="ghost">Create New</Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => window.location.reload()} variant="secondary">
+                    Retry
+                  </Button>
+                  <Button onClick={() => nav("/create")} variant="ghost">
+                    Create New
+                  </Button>
                 </div>
               }
             />
           ) : (
             <>
-              <div className="rounded-2xl overflow-hidden border border-slate-200 relative z-0">
+              <div className="relative z-0 overflow-hidden rounded-3xl border border-slate-200">
                 <TripRouteMap points={mapPoints} />
               </div>
 
-              <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-slate-500">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                 <div>
-                  Showing <b>{mapPoints.length}</b> pinned places (route draws when 2+ exist).
+                  Showing <b>{mapPoints.length}</b> pinned places
+                  {mapPoints.length > 1 ? " with route" : ""}.
                 </div>
                 <div>
                   Total requested: <b>{locations.length}</b>
@@ -308,38 +346,71 @@ export default function ViewTrip() {
           )}
         </CardBody>
       </Card>
+
+      {mapPoints.length > 0 && <PlacesGallery points={mapPoints} />}
     </div>
   );
 }
 
-/* ---------------- UI bits (small + stylish) ---------------- */
-
-function Header({ trip, summary, onBack, onNew, onDownload }) {
+function Header({ trip, summary, onBack, onNew, onEdit, onDownload }) {
   return (
-    // ✅ isolate creates a new stacking context so Leaflet can't overlay it
-    <Card className="overflow-hidden relative z-50 pointer-events-auto isolate">
-      <div className="bg-linear-to-r from-slate-950 via-slate-900 to-slate-950 text-white relative z-50 pointer-events-auto">
-        <div className="px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <Card className="relative z-50 isolate overflow-hidden">
+      <div className="pointer-events-auto relative z-50 bg-gradient-to-r from-sky-700 via-blue-700 to-indigo-800 text-white">
+        <div className="flex flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="text-xs/5 opacity-80">Your Trip</div>
-            <div className="text-2xl font-extrabold tracking-tight">
+            <div className="text-xs font-semibold uppercase tracking-wide text-white/80">
+              Your Trip
+            </div>
+            <div className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
               {trip?.destination || "Trip"}
             </div>
-            <div className="text-sm opacity-90 mt-1">
+            <div className="mt-2 text-sm text-white/85">
               {fmtRange(trip?.startDate, trip?.endDate)}
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2 md:justify-end">
-            {summary.days ? <Badge>{summary.days} days</Badge> : null}
-            {summary.style ? <Badge>pace: {summary.style}</Badge> : null}
-            {summary.budget ? <Badge>budget: {summary.budget}</Badge> : null}
+            {summary.days ? (
+              <Badge className="border-white/20 bg-white/10 text-white">
+                {summary.days} days
+              </Badge>
+            ) : null}
+            {summary.style ? (
+              <Badge className="border-white/20 bg-white/10 text-white">
+                pace: {summary.style}
+              </Badge>
+            ) : null}
+            {summary.budget ? (
+              <Badge className="border-white/20 bg-white/10 text-white">
+                budget: {summary.budget}
+              </Badge>
+            ) : null}
           </div>
         </div>
 
-        <div className="px-6 pb-5 flex flex-wrap gap-2">
-          <Button type="button" onClick={onBack} variant="secondary">Back to My Trips</Button>
-          <Button type="button" onClick={onNew} variant="ghost">Create New</Button>
+        <div className="flex flex-wrap gap-2 px-6 pb-6">
+          <Button type="button" onClick={onBack} variant="secondary">
+            Back to My Trips
+          </Button>
+
+          <Button
+            type="button"
+            onClick={onEdit}
+            variant="secondary"
+            className="bg-white/15 text-white hover:bg-white/20"
+          >
+            Edit Trip
+          </Button>
+
+          <Button
+            type="button"
+            onClick={onNew}
+            variant="ghost"
+            className="bg-white/10 text-white hover:bg-white/15"
+          >
+            Create New
+          </Button>
+
           <Button
             type="button"
             className="pointer-events-auto"
@@ -357,29 +428,168 @@ function Header({ trip, summary, onBack, onNew, onDownload }) {
   );
 }
 
+function TripOverview({ trip, summary }) {
+  const preferences = trip?.preferences || {};
+  const interests = Array.isArray(preferences?.interests) ? preferences.interests : [];
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Trip Overview"
+        subtitle="A quick summary of the trip settings and preferences"
+      />
+      <CardBody className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <InfoTile label="Destination" value={trip?.destination || "—"} />
+          <InfoTile label="Dates" value={fmtRange(trip?.startDate, trip?.endDate) || "—"} />
+          <InfoTile label="Pace" value={summary?.style || preferences?.pace || "—"} />
+          <InfoTile label="Budget" value={summary?.budget || preferences?.budget || "—"} />
+        </div>
+
+        {!!interests.length && (
+          <div>
+            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+              Interests
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {interests.map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold capitalize text-slate-700"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {preferences?.notes ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              Notes
+            </div>
+            <div className="mt-2 text-sm leading-6 text-slate-700">{preferences.notes}</div>
+          </div>
+        ) : null}
+      </CardBody>
+    </Card>
+  );
+}
+
+function PlacesGallery({ points }) {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Places from your itinerary"
+        subtitle="Photos and details for the locations in your saved trip"
+        right={<Badge>{points.length} places</Badge>}
+      />
+      <CardBody>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {points.map((place, i) => (
+            <div
+              key={`${place.location}-${i}`}
+              className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md"
+            >
+              <div className="relative h-44 overflow-hidden bg-slate-100">
+                {place.photoUrl ? (
+                  <img
+                    src={place.photoUrl}
+                    alt={place.title || place.location}
+                    className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    No photo available
+                  </div>
+                )}
+
+                <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white">
+                  Day {place.day} • {place.timeBlock}
+                </div>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {place.title || place.location}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {place.displayName || place.location}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {place.category ? (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                      {place.category}
+                    </span>
+                  ) : null}
+
+                  {place.type ? (
+                    <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+                      {place.type}
+                    </span>
+                  ) : null}
+                </div>
+
+                {place.address ? (
+                  <div className="text-xs leading-5 text-slate-500">{place.address}</div>
+                ) : null}
+
+                {place.wikipedia ? (
+                  <a
+                    href={place.wikipedia}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex text-xs font-semibold text-sky-700 hover:text-sky-800"
+                  >
+                    Learn more
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
 function DayCard({ day }) {
   return (
     <Card className="overflow-hidden">
-      <div className="p-5 bg-slate-900 text-white">
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-5 text-white">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs opacity-90">Day {day.day}</div>
-            <div className="text-lg font-extrabold leading-snug">{day.title}</div>
-            <div className="text-sm opacity-90 mt-1">{day.date}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-white/75">
+              Day {day.day}
+            </div>
+            <div className="mt-1 text-xl font-black leading-snug">{day.title}</div>
+            <div className="mt-1 text-sm text-white/80">{day.date}</div>
           </div>
-          <Badge>Day Plan</Badge>
+
+          <Badge className="border-white/20 bg-white/10 text-white">
+            Day Plan
+          </Badge>
         </div>
       </div>
 
       <CardBody>
-        <MiniSection title="Morning" items={day.morning} />
-        <MiniSection title="Afternoon" items={day.afternoon} />
-        <MiniSection title="Evening" items={day.evening} />
+        <MiniSection title="Morning" items={day.morning} icon="☀️" />
+        <MiniSection title="Afternoon" items={day.afternoon} icon="🌤️" />
+        <MiniSection title="Evening" items={day.evening} icon="🌙" />
 
         {(day.foodSuggestion || day.backupPlan) && (
-          <div className="mt-4 grid sm:grid-cols-2 gap-3">
-            {day.foodSuggestion ? <InfoTile label="Food" value={clamp(day.foodSuggestion)} /> : null}
-            {day.backupPlan ? <InfoTile label="Backup" value={clamp(day.backupPlan)} /> : null}
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {day.foodSuggestion ? (
+              <InfoTile label="Food Suggestion" value={clamp(day.foodSuggestion)} />
+            ) : null}
+            {day.backupPlan ? (
+              <InfoTile label="Backup Plan" value={clamp(day.backupPlan)} />
+            ) : null}
           </div>
         )}
       </CardBody>
@@ -389,17 +599,17 @@ function DayCard({ day }) {
 
 function TripSkeleton() {
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl">
       <Card>
         <CardBody>
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-slate-200 animate-pulse" />
-            <div className="space-y-2 flex-1">
-              <div className="h-4 bg-slate-200 rounded animate-pulse w-1/3" />
-              <div className="h-3 bg-slate-100 rounded animate-pulse w-1/2" />
+            <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-1/3 animate-pulse rounded bg-slate-200" />
+              <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
             </div>
           </div>
-          <div className="mt-5 h-28 bg-slate-100 rounded-xl animate-pulse" />
+          <div className="mt-5 h-28 animate-pulse rounded-2xl bg-slate-100" />
         </CardBody>
       </Card>
     </div>
@@ -408,30 +618,33 @@ function TripSkeleton() {
 
 function MapSkeleton() {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-800">Finding locations…</div>
-          <div className="text-xs text-slate-500 mt-1">Converting place names into coordinates.</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Converting place names into coordinates.
+          </div>
         </div>
-        <div className="h-8 w-8 rounded-full bg-slate-200 animate-pulse" />
+        <div className="h-8 w-8 animate-pulse rounded-full bg-slate-200" />
       </div>
-      <div className="mt-4 h-48 rounded-xl bg-slate-100 animate-pulse" />
+      <div className="mt-4 h-48 animate-pulse rounded-2xl bg-slate-100" />
     </div>
   );
 }
 
 function NiceEmptyState({ title, subtitle, hint, action }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-linear-to-b from-white to-slate-50 p-5">
+    <div className="rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-5">
       <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-2xl bg-slate-900/10 grid place-items-center">
-          <div className="h-4 w-4 rounded bg-slate-900/30" />
+        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-50">
+          <div className="h-4 w-4 rounded bg-sky-300" />
         </div>
+
         <div className="flex-1">
           <div className="text-sm font-bold text-slate-900">{title}</div>
-          <div className="text-sm text-slate-600 mt-1">{subtitle}</div>
-          {hint ? <div className="text-xs text-slate-500 mt-3 leading-relaxed">{hint}</div> : null}
+          <div className="mt-1 text-sm text-slate-600">{subtitle}</div>
+          {hint ? <div className="mt-3 text-xs leading-relaxed text-slate-500">{hint}</div> : null}
           {action ? <div className="mt-4">{action}</div> : null}
         </div>
       </div>
@@ -441,20 +654,25 @@ function NiceEmptyState({ title, subtitle, hint, action }) {
 
 function InfoTile({ label, value }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
-      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="text-sm text-slate-800 mt-1 leading-relaxed">{value}</div>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+      <div className="mt-1 text-sm leading-relaxed text-slate-800">{value}</div>
     </div>
   );
 }
 
-function MiniSection({ title, items }) {
+function MiniSection({ title, items, icon }) {
   if (!items?.length) return null;
 
   return (
-    <div className="mt-4">
+    <div className="mt-5">
       <div className="flex items-center justify-between">
-        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{title}</div>
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+          <span className="text-sm normal-case">{icon}</span>
+          {title}
+        </div>
         <div className="text-[11px] text-slate-500">
           {items.length} item{items.length > 1 ? "s" : ""}
         </div>
@@ -464,10 +682,12 @@ function MiniSection({ title, items }) {
         {items.map((x, i) => (
           <li
             key={x.id ?? `${x.title}-${x.location}-${i}`}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2"
+            className="rounded-2xl border border-slate-200 bg-white px-3 py-3 transition hover:border-sky-200 hover:bg-sky-50/30"
           >
-            <div className="font-semibold">{x.title}</div>
-            {x.location ? <div className="text-xs text-slate-500 mt-0.5">{x.location}</div> : null}
+            <div className="font-semibold text-slate-900">{x.title}</div>
+            {x.location ? (
+              <div className="mt-0.5 text-xs text-slate-500">{x.location}</div>
+            ) : null}
           </li>
         ))}
       </ul>
