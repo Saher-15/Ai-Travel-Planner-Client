@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { api } from "../api/client.js";
 import {
   Alert,
   Badge,
@@ -10,16 +11,51 @@ import {
 } from "../components/UI.jsx";
 
 export default function Contact() {
-  const [sent, setSent] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
 
-  const onSubmit = (e) => {
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  function updateField(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const onSubmit = async (e) => {
     e.preventDefault();
-    setSent(true);
+    setMsg(null);
+    setLoading(true);
+
+    try {
+      const { data } = await api.post("/contact", form);
+
+      setMsg({
+        type: "success",
+        text: data?.message || "Message sent successfully. We’ll reply soon.",
+      });
+
+      setForm({
+        name: "",
+        email: "",
+        message: "",
+      });
+    } catch (err) {
+      setMsg({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          "Failed to send message. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="grid gap-6 lg:grid-cols-12">
-      {/* Left side */}
       <div className="lg:col-span-5">
         <Card className="overflow-hidden">
           <div className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 p-6 text-white">
@@ -54,7 +90,6 @@ export default function Contact() {
         </Card>
       </div>
 
-      {/* Right side */}
       <div className="lg:col-span-7">
         <Card>
           <CardHeader
@@ -65,12 +100,20 @@ export default function Contact() {
           <CardBody>
             <form onSubmit={onSubmit} className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
-                <Input label="Name" placeholder="Your name" required />
+                <Input
+                  label="Name"
+                  placeholder="Your name"
+                  required
+                  value={form.name}
+                  onChange={(e) => updateField("name", e.target.value)}
+                />
                 <Input
                   label="Email"
                   type="email"
                   placeholder="you@email.com"
                   required
+                  value={form.email}
+                  onChange={(e) => updateField("email", e.target.value)}
                 />
               </div>
 
@@ -81,21 +124,21 @@ export default function Contact() {
                 <textarea
                   required
                   rows={6}
+                  value={form.message}
+                  onChange={(e) => updateField("message", e.target.value)}
                   placeholder="Tell us how we can help you..."
                   className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                 />
               </label>
 
-              {sent ? (
-                <Alert type="success">
-                  Message sent successfully (demo). We’ll reply soon.
-                </Alert>
-              ) : null}
+              {msg ? <Alert type={msg.type}>{msg.text}</Alert> : null}
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button type="submit">Send Message</Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Sending..." : "Send Message"}
+                </Button>
                 <div className="text-xs text-slate-500">
-                  Demo form for now — no backend email sending yet.
+                  Your message will be saved in the admin dashboard.
                 </div>
               </div>
             </form>

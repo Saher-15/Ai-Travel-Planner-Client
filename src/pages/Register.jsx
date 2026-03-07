@@ -135,8 +135,7 @@ export default function Register() {
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
+                  onChange={(e) => setEmail(e.target.value.toLowerCase())} autoComplete="email"
                 />
               </div>
 

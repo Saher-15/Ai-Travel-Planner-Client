@@ -95,7 +95,9 @@ function UserPill({ user }) {
       <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">
         {(user?.name || "T").trim().charAt(0).toUpperCase()}
       </span>
-      <span className="max-w-[140px] truncate">Welcome, {user?.name || "Traveler"}</span>
+      <span className="max-w-[140px] truncate">
+        Welcome, {user?.name || "Traveler"}
+      </span>
     </div>
   );
 }
@@ -119,6 +121,8 @@ export default function Layout({ children }) {
     navigate("/login");
   };
 
+  const isAdmin = user?.role === "admin";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-slate-100">
       {/* GLOBAL HEADER */}
@@ -137,6 +141,7 @@ export default function Layout({ children }) {
                     <NavItem to="/trips">My Trips</NavItem>
                     <NavItem to="/contact">Contact</NavItem>
                     <NavItem to="/profile">Profile</NavItem>
+                    {isAdmin ? <NavItem to="/admin/contacts">Admin</NavItem> : null}
                   </>
                 ) : (
                   <>
@@ -166,7 +171,10 @@ export default function Layout({ children }) {
             </div>
 
             {/* MOBILE TOGGLE */}
-            <MobileMenuButton open={mobileOpen} onClick={() => setMobileOpen((v) => !v)} />
+            <MobileMenuButton
+              open={mobileOpen}
+              onClick={() => setMobileOpen((v) => !v)}
+            />
           </div>
         </div>
 
@@ -189,6 +197,11 @@ export default function Layout({ children }) {
                 {user?.email ? (
                   <div className="mt-1 text-xs text-slate-500">{user.email}</div>
                 ) : null}
+                {isAdmin ? (
+                  <div className="mt-2 inline-flex rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-bold text-indigo-700">
+                    Admin
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -210,6 +223,11 @@ export default function Layout({ children }) {
                   <NavItem to="/profile" mobile>
                     Profile
                   </NavItem>
+                  {isAdmin ? (
+                    <NavItem to="/admin/contacts" mobile>
+                      Admin Contacts
+                    </NavItem>
+                  ) : null}
                   <NavItem onClick={onLogout} mobile>
                     Logout
                   </NavItem>

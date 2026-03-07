@@ -13,6 +13,7 @@ import EditTrip from "./pages/EditTrip.jsx";
 
 import Contact from "./pages/Contact.jsx";
 import Profile from "./pages/Profile.jsx";
+import AdminContacts from "./pages/AdminContacts.jsx";
 
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
@@ -29,31 +30,25 @@ export default function App() {
     <BrowserRouter>
       <Layout>
         <Routes>
-          {/* public */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* forgot/reset password */}
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
-
-          {/* email verification */}
           <Route path="/verify/:token" element={<VerifyEmail />} />
 
           <Route path="/contact" element={<Contact />} />
-
-          {/* profile is now PUBLIC (or at least not blocked for unverified users) */}
           <Route path="/profile" element={<Profile />} />
 
-          {/* protected */}
           <Route path="/create" element={<P><CreateTrip /></P>} />
           <Route path="/result" element={<P><TripResult /></P>} />
           <Route path="/trips" element={<P><MyTrips /></P>} />
           <Route path="/trip/:id" element={<P><ViewTrip /></P>} />
           <Route path="/trip/:id/edit" element={<P><EditTrip /></P>} />
 
-          {/* fallback */}
+          <Route path="/admin/contacts" element={<P><AdminContacts /></P>} />
+
           <Route
             path="*"
             element={<div className="text-sm text-slate-600">Not found</div>}

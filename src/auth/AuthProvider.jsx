@@ -5,10 +5,11 @@ const AuthCtx = createContext(null);
 
 function normalizeUser(u) {
   return {
-    id: u?.id || u?._id || null,
+    id: u?.id || u?._id || u?.userId || null,
     name: u?.name || "",
     email: u?.email || "",
     verified: Boolean(u?.verified),
+    role: u?.role || "user",
   };
 }
 
@@ -25,7 +26,10 @@ export function AuthProvider({ children }) {
 
     try {
       const { data } = await api.get("/auth/me", { withCredentials: true });
-      setUser(data?.user || null);
+
+      // supports either { user: {...} } or direct user object
+      const rawUser = data?.user || data || null;
+      setUser(rawUser);
     } catch (err) {
       if (err?.response?.status !== 401) {
         console.error("Auth refresh error:", err);

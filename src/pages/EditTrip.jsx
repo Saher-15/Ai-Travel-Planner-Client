@@ -9,20 +9,9 @@ import {
   CardBody,
   CardHeader,
   Input,
-  Select,
 } from "../components/UI.jsx";
 
 const BLOCKS = ["morning", "afternoon", "evening"];
-
-const interestOptions = [
-  "history",
-  "food",
-  "culture",
-  "nature",
-  "shopping",
-  "nightlife",
-  "family",
-];
 
 const BLOCK_META = {
   morning: {
@@ -71,6 +60,12 @@ function normalizeTripForForm(trip) {
     itinerary: {
       tripSummary: trip?.itinerary?.tripSummary || {},
       tips: safeArray(trip?.itinerary?.tips),
+      recommendedPlaces: safeArray(trip?.itinerary?.recommendedPlaces).map((place) => ({
+        name: place?.name || "",
+        reason: place?.reason || "",
+        category: place?.category || "",
+        location: place?.location || "",
+      })),
       days: safeArray(trip?.itinerary?.days).map((day, index) => ({
         day: day?.day ?? index + 1,
         title: day?.title || "",
@@ -150,37 +145,6 @@ export default function EditTrip() {
       );
     }, 0);
   }, [form]);
-
-  function setRootField(field, value) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function setPreference(field, value) {
-    setForm((prev) => ({
-      ...prev,
-      preferences: {
-        ...prev.preferences,
-        [field]: value,
-      },
-    }));
-  }
-
-  function toggleInterest(item) {
-    setForm((prev) => {
-      const current = prev.preferences.interests || [];
-      const next = current.includes(item)
-        ? current.filter((x) => x !== item)
-        : [...current, item];
-
-      return {
-        ...prev,
-        preferences: {
-          ...prev.preferences,
-          interests: next,
-        },
-      };
-    });
-  }
 
   function updateDay(dayIndex, field, value) {
     setForm((prev) => {
@@ -266,7 +230,13 @@ export default function EditTrip() {
           ...form.preferences,
           notes: (form.preferences.notes || "").trim(),
         },
-        itinerary: form.itinerary,
+        itinerary: {
+          ...form.itinerary,
+          tripSummary: form.itinerary.tripSummary || {},
+          tips: safeArray(form.itinerary.tips),
+          recommendedPlaces: safeArray(form.itinerary.recommendedPlaces),
+          days: safeArray(form.itinerary.days),
+        },
       });
 
       setSuccess("Trip updated successfully.");
@@ -311,7 +281,6 @@ export default function EditTrip() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      {/* HERO */}
       <Card className="overflow-hidden border-slate-200 shadow-[0_24px_80px_-30px_rgba(15,23,42,0.28)]">
         <div className="relative overflow-hidden bg-gradient-to-r from-sky-700 via-blue-700 to-indigo-800 px-6 py-7 text-white sm:px-8">
           <div className="absolute -left-10 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
@@ -350,11 +319,12 @@ export default function EditTrip() {
         </div>
       </Card>
 
+      {err ? <Alert type="error">{err}</Alert> : null}
+      {success ? <Alert type="success">{success}</Alert> : null}
+
       <form onSubmit={saveTrip} className="grid gap-6 lg:grid-cols-12">
-        {/* LEFT SIDEBAR */}
         <div className="space-y-6 lg:col-span-4">
           <div className="lg:sticky lg:top-6 lg:space-y-6">
-            
             <Card>
               <CardHeader
                 title="Actions"
@@ -384,10 +354,26 @@ export default function EditTrip() {
                 </Button>
               </CardBody>
             </Card>
+
+            <Card>
+              <CardHeader
+                title="Protected content"
+                subtitle="These are preserved when you edit the trip"
+              />
+              <CardBody className="space-y-3">
+                <MiniInfo
+                  label="Recommended Places"
+                  value={safeArray(form?.itinerary?.recommendedPlaces).length}
+                />
+                <MiniInfo
+                  label="Tips"
+                  value={safeArray(form?.itinerary?.tips).length}
+                />
+              </CardBody>
+            </Card>
           </div>
         </div>
 
-        {/* RIGHT CONTENT */}
         <div className="space-y-6 lg:col-span-8">
           {form.itinerary.days.map((day, dayIndex) => (
             <Card
@@ -487,7 +473,13 @@ export default function EditTrip() {
                                   placeholder="e.g. Visit the Colosseum"
                                   value={activity.title}
                                   onChange={(e) =>
-                                    updateActivity(dayIndex, block, activityIndex, "title", e.target.value)
+                                    updateActivity(
+                                      dayIndex,
+                                      block,
+                                      activityIndex,
+                                      "title",
+                                      e.target.value
+                                    )
                                   }
                                 />
                                 <Input
@@ -495,7 +487,13 @@ export default function EditTrip() {
                                   placeholder="e.g. Colosseum, Rome, Italy"
                                   value={activity.location}
                                   onChange={(e) =>
-                                    updateActivity(dayIndex, block, activityIndex, "location", e.target.value)
+                                    updateActivity(
+                                      dayIndex,
+                                      block,
+                                      activityIndex,
+                                      "location",
+                                      e.target.value
+                                    )
                                   }
                                 />
                               </div>
