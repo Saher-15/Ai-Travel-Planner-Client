@@ -46,6 +46,24 @@ function extractUniqueLocations(itinerary) {
   );
 }
 
+function extractRecommendedPlaces(itinerary) {
+  const rows = Array.isArray(itinerary?.recommendedPlaces)
+    ? itinerary.recommendedPlaces
+        .map((p, index) => ({
+          id: `${p?.name || "place"}-${index}`,
+          name: (p?.name || "Recommended Place").trim(),
+          reason: (p?.reason || "").trim(),
+          category: (p?.category || "").trim(),
+          location: (p?.location || "").trim(),
+        }))
+        .filter((p) => p.location)
+    : [];
+
+  return Array.from(
+    new Map(rows.map((x) => [x.location.toLowerCase(), x])).values()
+  );
+}
+
 function useAsync(fn, deps) {
   const [state, setState] = useState({ data: null, loading: true, error: "" });
 
@@ -152,7 +170,7 @@ function useGeoPoints(locations) {
           lon,
           photoUrl: detail?.photoUrl ?? null,
           displayName: detail?.display_name ?? hit?.display_name ?? null,
-          category: detail?.category ?? null,
+          category: p?.category || detail?.category || null,
           type: detail?.type ?? null,
           address: detail?.address ?? null,
           wikipedia: detail?.wikipedia ?? null,
@@ -202,11 +220,19 @@ export default function ViewTrip() {
   };
 
   const locations = useMemo(() => extractUniqueLocations(trip?.itinerary), [trip]);
+  const recommendedPlaces = useMemo(
+    () => extractRecommendedPlaces(trip?.itinerary),
+    [trip]
+  );
+
   const examples = useMemo(() => locations.slice(0, 3).map((x) => x.location), [locations]);
 
   const geoState = useGeoPoints(locations);
   const mapPoints = geoState.data?.points ?? [];
   const geoFailed = geoState.data?.failed ?? [];
+
+  const recommendedGeoState = useGeoPoints(recommendedPlaces);
+  const recommendedPoints = recommendedGeoState.data?.points ?? [];
 
   if (tripState.loading) return <TripSkeleton />;
 
@@ -265,6 +291,15 @@ export default function ViewTrip() {
               </div>
             </CardBody>
           </Card>
+        )}
+
+        {!!trip?.itinerary?.recommendedPlaces?.length && (
+          <RecommendedPlacesSection
+            places={trip.itinerary.recommendedPlaces}
+            enrichedPlaces={recommendedPoints}
+            loading={recommendedGeoState.loading}
+            error={recommendedGeoState.error}
+          />
         )}
       </div>
 
@@ -472,6 +507,120 @@ function TripOverview({ trip, summary }) {
             <div className="mt-2 text-sm leading-6 text-slate-700">{preferences.notes}</div>
           </div>
         ) : null}
+      </CardBody>
+    </Card>
+  );
+}
+
+function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
+  const displayedPlaces =
+    enrichedPlaces.length > 0
+      ? enrichedPlaces
+      : places.map((p, index) => ({
+          id: `${p?.name || "place"}-${index}`,
+          name: p?.name || "Recommended Place",
+          reason: p?.reason || "",
+          category: p?.category || "",
+          location: p?.location || "",
+        }));
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Recommended Places & Attractions"
+        subtitle="Extra ideas, nearby highlights, and must-visit spots for this destination"
+        right={<Badge>{displayedPlaces.length} picks</Badge>}
+      />
+      <CardBody className="space-y-4">
+        {error ? <Alert type="error">{error}</Alert> : null}
+
+        {loading ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+                <div className="h-44 animate-pulse bg-slate-100" />
+                <div className="space-y-3 p-4">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
+                  <div className="h-3 w-4/5 animate-pulse rounded bg-slate-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {displayedPlaces.map((place, i) => (
+              <div
+                key={place.id || `${place.location}-${i}`}
+                className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md"
+              >
+                <div className="relative h-44 overflow-hidden bg-slate-100">
+                  {place.photoUrl ? (
+                    <img
+                      src={place.photoUrl}
+                      alt={place.name || place.location}
+                      className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                      No photo available
+                    </div>
+                  )}
+
+                  {place.category ? (
+                    <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white">
+                      {place.category}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-3 p-4">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">
+                      {place.name || place.title || place.location}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {place.displayName || place.location}
+                    </div>
+                  </div>
+
+                  {place.reason ? (
+                    <div className="text-sm leading-6 text-slate-600">{place.reason}</div>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2">
+                    {place.type ? (
+                      <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+                        {place.type}
+                      </span>
+                    ) : null}
+                    {place.category ? (
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                        {place.category}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {place.address ? (
+                    <div className="text-xs leading-5 text-slate-500">{place.address}</div>
+                  ) : null}
+
+                  {place.wikipedia ? (
+                    <a
+                      href={place.wikipedia}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex text-xs font-semibold text-sky-700 hover:text-sky-800"
+                    >
+                      Learn more
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardBody>
     </Card>
   );
