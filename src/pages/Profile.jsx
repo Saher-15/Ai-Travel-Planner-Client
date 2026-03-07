@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { api } from "../api/client";
@@ -21,6 +21,10 @@ export default function Profile() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [msg, setMsg] = useState(null);
 
+  const [supportItems, setSupportItems] = useState([]);
+  const [supportLoading, setSupportLoading] = useState(true);
+  const [supportError, setSupportError] = useState("");
+
   const showMessage = (text, type = "success") => {
     setMsg({ text, type });
     setTimeout(() => setMsg(null), 3000);
@@ -31,6 +35,26 @@ export default function Profile() {
       pw
     );
   }
+
+  async function loadMySupportMessages() {
+    setSupportLoading(true);
+    setSupportError("");
+
+    try {
+      const { data } = await api.get("/contact/my/messages");
+      setSupportItems(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setSupportError(
+        err?.response?.data?.message || "Failed to load your support messages."
+      );
+    } finally {
+      setSupportLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMySupportMessages();
+  }, []);
 
   const onChangePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
@@ -83,7 +107,6 @@ export default function Profile() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-12">
-      {/* Left side */}
       <div className="lg:col-span-5">
         <Card className="overflow-hidden">
           <div className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 p-6 text-white">
@@ -110,15 +133,14 @@ export default function Profile() {
                 text="Keep your account secure by using a strong password and updating it when needed."
               />
               <InfoCard
-                title="Email verification"
-                text="Verify your email to unlock a more complete and trusted account experience."
+                title="Support replies"
+                text="Messages from admin support will appear below in your profile."
               />
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Right side */}
       <div className="space-y-6 lg:col-span-7">
         <Card>
           <CardHeader
@@ -215,6 +237,82 @@ export default function Profile() {
                 </div>
               </div>
             </div>
+
+            <Card className="border border-slate-200">
+              <CardHeader
+                title="My support messages"
+                subtitle="Replies from admin will appear here"
+                right={
+                  <Button variant="secondary" onClick={loadMySupportMessages} disabled={supportLoading}>
+                    Refresh
+                  </Button>
+                }
+              />
+              <CardBody className="space-y-4">
+                {supportError ? <Alert type="error">{supportError}</Alert> : null}
+
+                {supportLoading ? (
+                  <div className="text-sm text-slate-500">Loading support messages...</div>
+                ) : supportItems.length === 0 ? (
+                  <Alert type="info">You have not sent any support messages yet.</Alert>
+                ) : (
+                  <div className="space-y-4">
+                    {supportItems.map((item) => (
+                      <div
+                        key={item._id}
+                        className="rounded-3xl border border-slate-200 bg-white p-5"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <div className="text-base font-bold text-slate-900">
+                              {item.subject}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-400">
+                              Sent on {new Date(item.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+
+                          {item.status === "replied" ? (
+                            <Badge className="border-sky-200 bg-sky-50 text-sky-700">
+                              Replied
+                            </Badge>
+                          ) : (
+                            <Badge className="border-amber-200 bg-amber-50 text-amber-700">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Your message
+                          </div>
+                          <div className="mt-2 text-sm leading-6 text-slate-700">
+                            {item.message}
+                          </div>
+                        </div>
+
+                        {item.adminReply ? (
+                          <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 p-4">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                              Admin reply
+                            </div>
+                            <div className="mt-2 text-sm leading-6 text-slate-700">
+                              {item.adminReply}
+                            </div>
+                            {item.repliedAt ? (
+                              <div className="mt-2 text-xs text-slate-500">
+                                Replied on {new Date(item.repliedAt).toLocaleString()}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button variant="danger" onClick={onLogout}>

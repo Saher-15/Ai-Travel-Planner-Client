@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client.js";
+import { useAuth } from "../auth/AuthProvider";
 import {
   Alert,
   Badge,
@@ -11,9 +12,12 @@ import {
 } from "../components/UI.jsx";
 
 export default function Contact() {
+  const { user } = useAuth();
+
   const [form, setForm] = useState({
-    name: "",
-    email: "",
+    name: user?.name || "",
+    email: user?.email || "",
+    subject: "",
     message: "",
   });
 
@@ -30,18 +34,23 @@ export default function Contact() {
     setLoading(true);
 
     try {
-      const { data } = await api.post("/contact", form);
+      const { data } = await api.post("/contact", {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        subject: form.subject.trim(),
+        message: form.message.trim(),
+      });
 
       setMsg({
         type: "success",
         text: data?.message || "Message sent successfully. We’ll reply soon.",
       });
 
-      setForm({
-        name: "",
-        email: "",
+      setForm((prev) => ({
+        ...prev,
+        subject: "",
         message: "",
-      });
+      }));
     } catch (err) {
       setMsg({
         type: "error",
@@ -69,7 +78,7 @@ export default function Contact() {
 
             <p className="mt-3 text-sm leading-6 text-white/90">
               Need help with your itinerary, account, or trip planning experience?
-              Send us a message and we’ll get back to you soon.
+              Send us a message and the admin reply will appear inside your profile.
             </p>
 
             <div className="mt-6 grid gap-3">
@@ -117,6 +126,14 @@ export default function Contact() {
                 />
               </div>
 
+              <Input
+                label="Subject"
+                placeholder="What do you need help with?"
+                required
+                value={form.subject}
+                onChange={(e) => updateField("subject", e.target.value)}
+              />
+
               <label className="block">
                 <div className="mb-1.5 text-sm font-semibold text-slate-700">
                   Message
@@ -138,7 +155,7 @@ export default function Contact() {
                   {loading ? "Sending..." : "Send Message"}
                 </Button>
                 <div className="text-xs text-slate-500">
-                  Your message will be saved in the admin dashboard.
+                  Replies will appear in your profile page.
                 </div>
               </div>
             </form>

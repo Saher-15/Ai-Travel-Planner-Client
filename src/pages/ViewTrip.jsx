@@ -80,7 +80,7 @@ function useAsync(fn, deps) {
           setState({
             data: null,
             loading: false,
-            error: e?.response?.data?.message || "Something went wrong",
+            error: e?.response?.data?.message || e?.message || "Something went wrong",
           });
         }
       }
@@ -189,6 +189,107 @@ function useGeoPoints(locations) {
   }, [locations]);
 }
 
+function useDestinationWeather(destination, fallbackPoint) {
+  return useAsync(async () => {
+    if (!destination && !fallbackPoint) return null;
+
+    let lat = Number(fallbackPoint?.lat);
+    let lon = Number(fallbackPoint?.lon);
+    let resolvedName = destination || fallbackPoint?.displayName || "";
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      const { data } = await api.post("/geocode/batch", {
+        queries: [destination],
+      });
+
+      const first = Array.isArray(data?.results) ? data.results[0] : null;
+      lat = Number(first?.lat);
+      lon = Number(first?.lon);
+      resolvedName = first?.display_name || resolvedName;
+    }
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      throw new Error("Could not find destination weather coordinates.");
+    }
+
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}` +
+      `&longitude=${lon}` +
+      `&current=temperature_2m,apparent_temperature,wind_speed_10m,weather_code` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
+      `&forecast_days=7&timezone=auto`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error("Failed to load weather.");
+    }
+
+    const weather = await res.json();
+
+    return {
+      name: resolvedName || destination,
+      lat,
+      lon,
+      current: weather?.current ?? null,
+      daily: weather?.daily ?? null,
+    };
+  }, [destination, fallbackPoint?.lat, fallbackPoint?.lon, fallbackPoint?.displayName]);
+}
+
+function weatherCodeToLabel(code) {
+  const map = {
+    0: "Clear sky",
+    1: "Mostly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Depositing rime fog",
+    51: "Light drizzle",
+    53: "Moderate drizzle",
+    55: "Dense drizzle",
+    56: "Light freezing drizzle",
+    57: "Dense freezing drizzle",
+    61: "Slight rain",
+    63: "Moderate rain",
+    65: "Heavy rain",
+    66: "Light freezing rain",
+    67: "Heavy freezing rain",
+    71: "Slight snow",
+    73: "Moderate snow",
+    75: "Heavy snow",
+    77: "Snow grains",
+    80: "Rain showers",
+    81: "Moderate rain showers",
+    82: "Violent rain showers",
+    85: "Snow showers",
+    86: "Heavy snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with hail",
+    99: "Severe thunderstorm with hail",
+  };
+
+  return map[code] || "Weather update";
+}
+
+function weatherCodeToEmoji(code) {
+  if (code === 0) return "☀️";
+  if ([1, 2].includes(code)) return "🌤️";
+  if (code === 3) return "☁️";
+  if ([45, 48].includes(code)) return "🌫️";
+  if ([51, 53, 55, 56, 57].includes(code)) return "🌦️";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "🌧️";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "❄️";
+  if ([95, 96, 99].includes(code)) return "⛈️";
+  return "🌍";
+}
+
+function dayName(dateStr) {
+  if (!dateStr) return "Day";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString(undefined, { weekday: "short" });
+}
+
 export default function ViewTrip() {
   const nav = useNavigate();
   const { id } = useParams();
@@ -234,6 +335,8 @@ export default function ViewTrip() {
   const recommendedGeoState = useGeoPoints(recommendedPlaces);
   const recommendedPoints = recommendedGeoState.data?.points ?? [];
 
+  const weatherState = useDestinationWeather(trip?.destination, mapPoints[0]);
+
   if (tripState.loading) return <TripSkeleton />;
 
   if (tripState.error) {
@@ -265,6 +368,11 @@ export default function ViewTrip() {
         />
 
         <TripOverview trip={trip} summary={summary} />
+
+        <WeatherSection
+          state={weatherState}
+          destination={trip?.destination}
+        />
 
         <div className="grid gap-6 lg:grid-cols-2">
           {trip?.itinerary?.days?.map((d) => (
@@ -509,6 +617,127 @@ function TripOverview({ trip, summary }) {
         ) : null}
       </CardBody>
     </Card>
+  );
+}
+
+function WeatherSection({ state, destination }) {
+  if (state.loading) {
+    return (
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Weather Preview"
+          subtitle={`Checking current conditions for ${destination || "your destination"}`}
+        />
+        <CardBody>
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+            <div className="h-36 animate-pulse rounded-3xl bg-slate-100" />
+            <div className="grid grid-cols-3 gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  if (state.error || !state.data?.current) {
+    return null;
+  }
+
+  const current = state.data.current;
+  const daily = state.data.daily || {};
+  const days = Array.isArray(daily?.time)
+    ? daily.time.map((date, i) => ({
+        date,
+        weatherCode: daily?.weather_code?.[i],
+        max: daily?.temperature_2m_max?.[i],
+        min: daily?.temperature_2m_min?.[i],
+        rainChance: daily?.precipitation_probability_max?.[i],
+      }))
+    : [];
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Weather Preview"
+        subtitle={`Current forecast for ${state.data?.name || destination || "your destination"}`}
+        right={
+          <Badge className="border-sky-200 bg-sky-50 text-sky-700">
+            Live weather
+          </Badge>
+        }
+      />
+      <CardBody className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
+          <div className="rounded-[1.75rem] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-5">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-500">
+                  Right now
+                </div>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="text-4xl">{weatherCodeToEmoji(current.weather_code)}</div>
+                  <div>
+                    <div className="text-3xl font-black tracking-tight text-slate-900">
+                      {Math.round(current.temperature_2m)}°C
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      {weatherCodeToLabel(current.weather_code)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:min-w-[220px] sm:grid-cols-2">
+                <MetricTile
+                  label="Feels like"
+                  value={`${Math.round(current.apparent_temperature)}°C`}
+                />
+                <MetricTile
+                  label="Wind"
+                  value={`${Math.round(current.wind_speed_10m)} km/h`}
+                />
+              </div>
+            </div>
+          </div>
+
+<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">            {days.slice(0, 7).map((item, i) => (
+              <div
+                key={`${item.date}-${i}`}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  {i === 0 ? "Today" : dayName(item.date)}
+                </div>
+                <div className="mt-2 text-2xl">{weatherCodeToEmoji(item.weatherCode)}</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">
+                  {weatherCodeToLabel(item.weatherCode)}
+                </div>
+                <div className="mt-2 text-xs text-slate-600">
+                  {Math.round(item.max)}° / {Math.round(item.min)}°
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Rain: {Number.isFinite(item.rainChance) ? `${item.rainChance}%` : "—"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+function MetricTile({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
+    </div>
   );
 }
 
