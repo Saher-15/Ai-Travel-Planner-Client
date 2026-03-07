@@ -79,7 +79,7 @@ export default function Register() {
       {/* Left side */}
       <div className="lg:col-span-5">
         <Card className="overflow-hidden">
-          <div className="bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 p-6 text-white">
+          <div className="bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 p-6 text-white">
             <Badge className="border-white/20 bg-white/15 text-white">
               New Account
             </Badge>

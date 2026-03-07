@@ -78,7 +78,7 @@ export default function Login() {
       {/* Left side */}
       <div className="lg:col-span-5">
         <Card className="overflow-hidden border-slate-200 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.28)]">
-          <div className="relative overflow-hidden bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 p-6 text-white sm:p-8">
+          <div className="relative overflow-hidden bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 p-6 text-white sm:p-8">
             <div className="absolute -left-8 top-0 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
             <div className="absolute bottom-0 right-0 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
 

@@ -284,7 +284,7 @@ export default function EditTrip() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <Card className="overflow-hidden border-slate-200 shadow-[0_24px_80px_-30px_rgba(15,23,42,0.28)]">
-        <div className="relative overflow-hidden bg-gradient-to-r from-sky-700 via-blue-700 to-indigo-800 px-6 py-7 text-white sm:px-8">
+        <div className="relative overflow-hidden bg-linear-to-r from-sky-700 via-blue-700 to-indigo-800 px-6 py-7 text-white sm:px-8">
           <div className="absolute -left-10 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-52 w-52 rounded-full bg-cyan-300/10 blur-3xl" />
 
@@ -386,7 +386,7 @@ export default function EditTrip() {
               key={dayIndex}
               className="overflow-hidden border border-slate-200 shadow-sm transition duration-300 hover:shadow-md"
             >
-              <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-5 text-white">
+              <div className="bg-linear-to-r from-slate-900 to-slate-800 p-5 text-white">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-white/75">
@@ -426,7 +426,7 @@ export default function EditTrip() {
                   return (
                     <div
                       key={block}
-                      className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4"
+                      className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4"
                     >
                       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -520,7 +520,7 @@ export default function EditTrip() {
                       value={day.foodSuggestion}
                       onChange={(e) => updateDay(dayIndex, "foodSuggestion", e.target.value)}
                       placeholder="Recommended meal, restaurant style, or local specialty..."
-                      className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                      className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                     />
                   </label>
 
@@ -532,7 +532,7 @@ export default function EditTrip() {
                       value={day.backupPlan}
                       onChange={(e) => updateDay(dayIndex, "backupPlan", e.target.value)}
                       placeholder="Alternative idea in case of weather or time issues..."
-                      className="min-h-[100px] w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                      className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                     />
                   </label>
                 </div>

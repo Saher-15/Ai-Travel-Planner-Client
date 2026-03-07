@@ -33,37 +33,39 @@ const eventTypeOptions = [
   "sports",
 ];
 
-const quickTemplates = [
-  {
-    title: "City Explorer",
-    desc: "Museums, landmarks, food, and a balanced daily pace.",
-    pace: "moderate",
-    budget: "mid",
-    interests: ["history", "food", "culture"],
-    notes: "Balanced trip with iconic places, local food, and city highlights.",
-  },
-  {
-    title: "Relaxed Escape",
-    desc: "Lighter schedule with scenic places and less rushing.",
-    pace: "relaxed",
-    budget: "mid",
-    interests: ["nature", "culture"],
-    notes: "Slow-paced trip with scenic spots, cafes, and relaxed timing.",
-  },
-  {
-    title: "Packed Adventure",
-    desc: "See as much as possible with a dense itinerary.",
-    pace: "packed",
-    budget: "high",
-    interests: ["history", "shopping", "nightlife"],
-    notes: "High-energy schedule with many attractions and busy days.",
-  },
-];
+function toISODateLocal(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-function todayISOPlus(days) {
+function todayISOPlus(days = 0) {
   const d = new Date();
+  d.setHours(12, 0, 0, 0);
   d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
+  return toISODateLocal(d);
+}
+
+function addDays(isoDate, days) {
+  if (!isoDate) return todayISOPlus(days);
+  const d = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return todayISOPlus(days);
+  d.setDate(d.getDate() + days);
+  return toISODateLocal(d);
+}
+
+function clampToToday(isoDate) {
+  const today = todayISOPlus(0);
+  if (!isoDate) return today;
+  return isoDate < today ? today : isoDate;
+}
+
+function parseCities(text) {
+  return String(text || "")
+    .split("\n")
+    .map((city) => city.trim())
+    .filter(Boolean);
 }
 
 function formatTravelersLabel(value) {
@@ -75,6 +77,18 @@ function normalizeSourceTab(tab) {
   if (!tab) return "";
   if (["Flights", "Hotels", "Stays", "Activities"].includes(tab)) return tab;
   return "";
+}
+
+function getTripEnergy(pace, budget) {
+  if (pace === "packed" && budget === "high") {
+    return "Fast, premium, and full of highlights";
+  }
+  if (pace === "packed") return "Busy days with maximum exploration";
+  if (pace === "relaxed" && budget === "high") {
+    return "Comfort-first with a luxury feel";
+  }
+  if (pace === "relaxed") return "Easy rhythm, less rush, more breathing room";
+  return "Balanced flow with smart daily pacing";
 }
 
 export default function CreateTrip() {
@@ -89,9 +103,17 @@ export default function CreateTrip() {
   const tripTypeParam = searchParams.get("tripType") || "";
   const fromParam = searchParams.get("from") || "";
 
+  const safeInitialStart = clampToToday(startDateParam || todayISOPlus(0));
+  const safeInitialEnd =
+    endDateParam && endDateParam > safeInitialStart
+      ? endDateParam
+      : addDays(safeInitialStart, 1);
+
+  const [tripMode, setTripMode] = useState("single");
   const [destination, setDestination] = useState(destinationParam);
-  const [startDate, setStartDate] = useState(startDateParam || todayISOPlus(0));
-  const [endDate, setEndDate] = useState(endDateParam || todayISOPlus(1));
+  const [multiCities, setMultiCities] = useState("");
+  const [startDate, setStartDate] = useState(safeInitialStart);
+  const [endDate, setEndDate] = useState(safeInitialEnd);
   const [pace, setPace] = useState("moderate");
   const [budget, setBudget] = useState("mid");
   const [interests, setInterests] = useState([]);
@@ -107,9 +129,15 @@ export default function CreateTrip() {
   const from = fromParam;
 
   useEffect(() => {
-    if (destinationParam) setDestination(destinationParam);
-    if (startDateParam) setStartDate(startDateParam);
-    if (endDateParam) setEndDate(endDateParam);
+    const nextStart = clampToToday(startDateParam || todayISOPlus(0));
+    const nextEnd =
+      endDateParam && endDateParam > nextStart
+        ? endDateParam
+        : addDays(nextStart, 1);
+
+    setDestination(destinationParam || "");
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
 
     if (sourceTab === "Activities") {
       setInterests((prev) => {
@@ -141,34 +169,58 @@ export default function CreateTrip() {
         setPace("moderate");
       }
     }
-  }, [
-    destinationParam,
-    startDateParam,
-    endDateParam,
-    sourceTab,
-    tripType,
-  ]);
+  }, [destinationParam, startDateParam, endDateParam, sourceTab, tripType]);
+
+  const minStartDate = todayISOPlus(0);
+  const minEndDate = useMemo(() => addDays(startDate || minStartDate, 1), [startDate]);
+
+  const parsedCities = useMemo(() => parseCities(multiCities), [multiCities]);
 
   const daysCount = useMemo(() => {
-    const s = new Date(startDate);
-    const e = new Date(endDate);
+    const s = new Date(`${startDate}T12:00:00`);
+    const e = new Date(`${endDate}T12:00:00`);
 
-    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || s > e) {
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || s >= e) {
       return null;
     }
 
     return Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
   }, [startDate, endDate]);
 
-  const formSummary = useMemo(() => {
-    if (!destination.trim()) return "Start by choosing where you want to go.";
+  const tripEnergy = useMemo(() => getTripEnergy(pace, budget), [pace, budget]);
 
-    let summary = `A ${pace} ${daysCount || ""}-day trip to ${destination.trim()}`;
+  const previewTitle = useMemo(() => {
+    if (tripMode === "multi") {
+      return parsedCities.length ? parsedCities.join(" → ") : "Your cities";
+    }
+    return destination || "Your destination";
+  }, [tripMode, parsedCities, destination]);
+
+  const mapQuery = useMemo(() => {
+    if (tripMode === "multi") return parsedCities[0] || "";
+    return destination;
+  }, [tripMode, parsedCities, destination]);
+
+  const formSummary = useMemo(() => {
+    if (tripMode === "single" && !destination.trim()) {
+      return "Start by choosing where you want to go.";
+    }
+
+    if (tripMode === "multi" && parsedCities.length === 0) {
+      return "Add the cities you want to visit, one city per line.";
+    }
+
+    const target =
+      tripMode === "multi"
+        ? parsedCities.join(" → ")
+        : destination.trim();
+
+    let summary = `A ${pace} ${daysCount || ""}-day trip to ${target}`;
     if (budget) summary += ` with a ${budget} budget`;
     if (travelers) summary += ` for ${formatTravelersLabel(travelers).toLowerCase()}`;
     if (includeEvents) summary += " including local events";
     return summary;
-  }, [destination, pace, daysCount, budget, travelers, includeEvents]);
+  }, [tripMode, destination, parsedCities, pace, daysCount, budget, travelers, includeEvents]);
 
   function toggleInterest(x) {
     setInterests((prev) =>
@@ -182,17 +234,33 @@ export default function CreateTrip() {
     );
   }
 
-  function applyTemplate(template) {
-    setPace(template.pace);
-    setBudget(template.budget);
-    setInterests(template.interests);
-    setNotes(template.notes || "");
+  function handleStartDateChange(value) {
+    const safeStart = clampToToday(value || todayISOPlus(0));
+    setStartDate(safeStart);
+    setEndDate(addDays(safeStart, 1));
+  }
+
+  function handleEndDateChange(value) {
+    if (!value) {
+      setEndDate(addDays(startDate, 1));
+      return;
+    }
+
+    if (value <= startDate) {
+      setEndDate(addDays(startDate, 1));
+      return;
+    }
+
+    setEndDate(value);
   }
 
   function resetForm() {
+    const nextStart = clampToToday(startDateParam || todayISOPlus(0));
+    setTripMode("single");
     setDestination(destinationParam || "");
-    setStartDate(startDateParam || todayISOPlus(0));
-    setEndDate(endDateParam || todayISOPlus(1));
+    setMultiCities("");
+    setStartDate(nextStart);
+    setEndDate(addDays(nextStart, 1));
     setPace("moderate");
     setBudget("mid");
     setInterests([]);
@@ -208,9 +276,15 @@ export default function CreateTrip() {
 
     const cleanDestination = destination.trim();
     const cleanNotes = notes.trim();
+    const cities = parsedCities;
 
-    if (!cleanDestination) {
+    if (tripMode === "single" && !cleanDestination) {
       setErr("Please enter a destination.");
+      return;
+    }
+
+    if (tripMode === "multi" && cities.length < 2) {
+      setErr("Please enter at least 2 cities for a multi-city trip.");
       return;
     }
 
@@ -227,8 +301,10 @@ export default function CreateTrip() {
     setLoading(true);
 
     try {
-      const { data: trip } = await api.post("/trips/generate-and-save", {
-        destination: cleanDestination,
+      const payload = {
+        tripMode,
+        destination: tripMode === "single" ? cleanDestination : cities.join(" → "),
+        destinations: tripMode === "multi" ? cities : [cleanDestination],
         startDate,
         endDate,
         preferences: {
@@ -243,11 +319,15 @@ export default function CreateTrip() {
           includeEvents,
           eventTypes,
         },
-      });
+      };
 
+      const { data: trip } = await api.post("/trips/generate-and-save", payload);
       nav(`/trip/${trip._id}`);
     } catch (e2) {
-      setErr(e2?.response?.data?.message || "Generate failed. Please log in and try again.");
+      setErr(
+        e2?.response?.data?.message ||
+          "Generate failed. Please log in and try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -256,26 +336,35 @@ export default function CreateTrip() {
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden border-slate-200 shadow-[0_24px_80px_-30px_rgba(15,23,42,0.25)]">
-        <div className="bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-700 p-6 text-white sm:p-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative overflow-hidden bg-linear-to-br from-sky-600 via-blue-600 to-indigo-700 p-6 text-white sm:p-8">
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute -right-10 top-0 h-40 w-40 rounded-full bg-white/20 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl" />
+          </div>
+
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <Badge className="border-white/20 bg-white/10 text-white">
                 AI Trip Builder
               </Badge>
+
               <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
                 Create your next trip in minutes
               </h1>
+
               <p className="mt-3 text-sm leading-6 text-white/90 sm:text-base">
                 Choose your destination, dates, pace, budget, and interests — then let AI
                 generate a polished itinerary you can save and explore.
               </p>
 
-              <div className="mt-4 text-sm text-white/85">
-                {formSummary}
-              </div>
+              <div className="mt-4 text-sm text-white/85">{formSummary}</div>
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Badge className="border-white/20 bg-white/10 text-white">
+                {tripMode === "multi" ? "Multi city" : "One city"}
+              </Badge>
+
               {daysCount ? (
                 <Badge className="border-white/20 bg-white/10 text-white">
                   {daysCount} days
@@ -285,6 +374,12 @@ export default function CreateTrip() {
                   Invalid dates
                 </Badge>
               )}
+
+              {tripMode === "multi" && parsedCities.length ? (
+                <Badge className="border-white/20 bg-white/10 text-white">
+                  {parsedCities.length} cities
+                </Badge>
+              ) : null}
 
               {travelers ? (
                 <Badge className="border-white/20 bg-white/10 text-white">
@@ -320,35 +415,91 @@ export default function CreateTrip() {
             <CardHeader
               title="Trip details"
               subtitle="Fill in the essentials for your itinerary"
-              right={
-                daysCount ? <Badge>{daysCount} days</Badge> : <Badge>Check dates</Badge>
-              }
+              right={daysCount ? <Badge>{daysCount} days</Badge> : <Badge>Check dates</Badge>}
             />
 
             <CardBody>
               <form onSubmit={generate} className="space-y-5">
-                <Input
-                  label="Destination"
-                  placeholder="e.g., Paris, France"
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                />
+                <div>
+                  <div className="mb-2 text-sm font-semibold text-slate-700">Trip mode</div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTripMode("single")}
+                      className={[
+                        "rounded-full border px-4 py-2 text-sm font-semibold transition",
+                        tripMode === "single"
+                          ? "border-sky-600 bg-sky-600 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      One city
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTripMode("multi")}
+                      className={[
+                        "rounded-full border px-4 py-2 text-sm font-semibold transition",
+                        tripMode === "multi"
+                          ? "border-sky-600 bg-sky-600 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      Multi city
+                    </button>
+                  </div>
+                </div>
+
+                {tripMode === "single" ? (
+                  <Input
+                    label="Destination"
+                    placeholder="e.g., Paris, France"
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
+                  />
+                ) : (
+                  <label className="block">
+                    <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
+                      <span>Cities</span>
+                      <span className="text-xs font-medium text-slate-400">
+                        {parsedCities.length} selected
+                      </span>
+                    </div>
+
+                    <textarea
+                      value={multiCities}
+                      onChange={(e) => setMultiCities(e.target.value)}
+                      placeholder={`Paris, France\nRome, Italy\nBarcelona, Spain`}
+                      className="min-h-30 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                    />
+
+                    <div className="mt-2 text-xs text-slate-500">
+                      Enter one city per line. The itinerary will include all listed cities.
+                    </div>
+                  </label>
+                )}
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Input
-                    label="Start date"
-                    type="date"
-                    value={startDate}
-                    min={todayISOPlus(0)}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                  <Input
-                    label="End date"
-                    type="date"
-                    value={endDate}
-                    min={startDate || todayISOPlus(0)}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
+                  <div>
+                    <Input
+                      label="Start date"
+                      type="date"
+                      value={startDate}
+                      min={minStartDate}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Input
+                      label="End date"
+                      type="date"
+                      value={endDate}
+                      min={minEndDate}
+                      onChange={(e) => handleEndDateChange(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -365,27 +516,10 @@ export default function CreateTrip() {
                   </Select>
                 </div>
 
-                {(sourceTab || travelers || from || tripType) && (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="mb-3 text-sm font-semibold text-slate-800">
-                      Imported from Home page
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {sourceTab ? <MiniInfo label="Source tab" value={sourceTab} /> : null}
-                      {travelers ? <MiniInfo label="Travelers" value={formatTravelersLabel(travelers)} /> : null}
-                      {tripType ? <MiniInfo label="Trip type" value={tripType} /> : null}
-                      {from ? <MiniInfo label="From" value={from} /> : null}
-                    </div>
-                  </div>
-                )}
-
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-slate-700">Interests</div>
-                    <div className="text-xs text-slate-500">
-                      {interests.length} selected
-                    </div>
+                    <div className="text-xs text-slate-500">{interests.length} selected</div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -479,7 +613,7 @@ export default function CreateTrip() {
                     maxLength={300}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="e.g., we like walking, cafes, local food, not too early, family-friendly..."
-                    className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                    className="min-h-30 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                   />
                 </label>
 
@@ -515,56 +649,18 @@ export default function CreateTrip() {
               </form>
             </CardBody>
           </Card>
-
-          <Card>
-            <CardHeader
-              title="Quick templates"
-              subtitle="Use a preset style to fill pace, budget, interests, and notes faster"
-            />
-            <CardBody className="space-y-3">
-              {quickTemplates.map((template) => (
-                <button
-                  key={template.title}
-                  type="button"
-                  onClick={() => applyTemplate(template)}
-                  className="block w-full rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50/40 hover:shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">{template.title}</div>
-                      <div className="mt-1 text-sm text-slate-600">{template.desc}</div>
-                    </div>
-                    <Badge>{template.pace}</Badge>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {template.interests.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-              ))}
-            </CardBody>
-          </Card>
         </div>
 
         <div className="space-y-6 lg:col-span-7">
           <Card className="overflow-hidden">
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-white">
+            <div className="bg-linear-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-white">
               <div className="text-sm font-semibold uppercase tracking-wide text-white/75">
                 Live Preview
               </div>
 
               <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <div className="text-2xl font-black">
-                    {destination || "Your destination"}
-                  </div>
+                  <div className="text-2xl font-black">{previewTitle}</div>
                   <div className="mt-2 text-sm text-white/85">
                     {startDate} → {endDate} • pace: {pace} • budget: {budget}
                   </div>
@@ -574,6 +670,12 @@ export default function CreateTrip() {
                   <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
                     {daysCount ? `${daysCount} days` : "Invalid dates"}
                   </span>
+
+                  {tripMode === "multi" && parsedCities.length ? (
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
+                      {parsedCities.length} cities
+                    </span>
+                  ) : null}
 
                   {travelers ? (
                     <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
@@ -620,10 +722,36 @@ export default function CreateTrip() {
               </div>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <MiniInfo label="Destination" value={destination || "Not selected yet"} />
+                <MiniInfo
+                  label={tripMode === "multi" ? "Trip mode" : "Destination"}
+                  value={tripMode === "multi" ? "Multi-city" : (destination || "Not selected yet")}
+                />
                 <MiniInfo label="Pace" value={pace} />
                 <MiniInfo label="Budget" value={budget} />
               </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <MiniInfo label="Trip energy" value={tripEnergy} />
+                <MiniInfo label="Date rule" value="End date stays after start date" />
+              </div>
+
+              {tripMode === "multi" && parsedCities.length ? (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Cities in this trip
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {parsedCities.map((city) => (
+                      <span
+                        key={city}
+                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                      >
+                        {city}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               {(sourceTab || travelers || tripType) && (
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -657,21 +785,19 @@ export default function CreateTrip() {
             <CardHeader
               title="Destination map"
               subtitle={
-                destination
-                  ? `Live location preview for ${destination}`
+                mapQuery
+                  ? `Live location preview for ${mapQuery}`
                   : "Enter a destination to preview it on the map"
               }
             />
             <CardBody className="space-y-4">
-              <MapTilerMap query={destination} height={380} />
+              <MapTilerMap query={mapQuery} height={380} />
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-1">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  Use the live map to confirm your destination before generating the full itinerary.
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  Strong map preview makes the planning flow feel more visual and premium.
+                  {tripMode === "multi"
+                    ? "For multi-city trips, the map previews your first city before generation."
+                    : "Use the live map to confirm your destination before generating the full itinerary."}
                 </div>
               </div>
             </CardBody>

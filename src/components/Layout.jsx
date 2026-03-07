@@ -36,7 +36,7 @@ function Brand() {
       <div
         className={cx(
           "grid h-11 w-11 shrink-0 place-items-center rounded-2xl",
-          "bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white",
+          "bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-white",
           "shadow-[0_10px_30px_-12px_rgba(37,99,235,0.45)] ring-1 ring-sky-900/10",
           "transition duration-300 group-hover:scale-[1.03]"
         )}
@@ -95,7 +95,7 @@ function UserPill({ user }) {
       <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">
         {(user?.name || "T").trim().charAt(0).toUpperCase()}
       </span>
-      <span className="max-w-[140px] truncate">
+      <span className="max-w-35 truncate">
         Welcome, {user?.name || "Traveler"}
       </span>
     </div>
@@ -121,7 +121,7 @@ function Footer({ isLoggedIn, isAdmin }) {
           {/* BRAND */}
           <div className="space-y-4">
             <Link to="/" className="inline-flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-[0_10px_30px_-12px_rgba(37,99,235,0.45)]">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-[0_10px_30px_-12px_rgba(37,99,235,0.45)]">
                 <span className="text-sm font-extrabold tracking-tight">TP</span>
               </div>
 
@@ -220,9 +220,9 @@ export default function Layout({ children }) {
   const isAdmin = user?.role === "admin";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-slate-100">
+    <div className="min-h-screen bg-linear-to-b from-sky-50 via-white to-slate-100">
       {/* GLOBAL HEADER */}
-      <header className="sticky top-0 z-[200] border-b border-slate-200/70 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/75">
+      <header className="sticky top-0 z-200 border-b border-slate-200/70 bg-white/85 backdrop-blur-xl supports-backdrop-filter:bg-white/75">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <Brand />
@@ -278,7 +278,7 @@ export default function Layout({ children }) {
         <div
           className={cx(
             "overflow-hidden border-t border-slate-200 bg-white/95 backdrop-blur-xl transition-all duration-300 md:hidden",
-            mobileOpen ? "max-h-[700px] opacity-100" : "max-h-0 opacity-0"
+            mobileOpen ? "max-h-175 opacity-100" : "max-h-0 opacity-0"
           )}
         >
           <div className="mx-auto max-w-7xl space-y-3 px-4 py-4 sm:px-6">
@@ -360,7 +360,7 @@ export default function Layout({ children }) {
 
       {/* EMAIL VERIFICATION BANNER */}
       {isLoggedIn && user && !user.verified && (
-        <div className="relative z-[190] border-b border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50">
+        <div className="relative z-190 border-b border-amber-300 bg-linear-to-r from-amber-50 to-yellow-50">
           <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-3 text-center text-sm font-semibold text-amber-800 sm:px-6">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-xs">
               !

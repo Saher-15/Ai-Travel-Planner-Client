@@ -140,13 +140,13 @@ export default function Home() {
   return (
     <div className="space-y-20">
       {/* HERO */}
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_30px_100px_-35px_rgba(15,23,42,0.35)]">
+      <section className="relative overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-[0_30px_100px_-35px_rgba(15,23,42,0.35)]">
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_30%),linear-gradient(to_bottom_right,#f8fbff,#ffffff,#f2f8ff)]" />
           <div className="absolute -left-10 top-0 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl" />
           <div className="absolute right-0 top-16 h-80 w-80 rounded-full bg-indigo-200/25 blur-3xl" />
           <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-100/30 blur-3xl" />
-          <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:32px_32px]" />
+          <div className="absolute inset-0 opacity-40 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[32px_32px]" />
         </div>
 
         <div className="relative grid gap-10 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-12 lg:px-10 lg:py-14">
@@ -160,7 +160,7 @@ export default function Home() {
             <div className="mt-6 max-w-3xl">
               <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-6xl xl:text-7xl">
                 Turn ideas into
-                <span className="mt-2 block bg-gradient-to-r from-sky-700 via-blue-600 to-indigo-500 bg-clip-text text-transparent">
+                <span className="mt-2 block bg-linear-to-r from-sky-700 via-blue-600 to-indigo-500 bg-clip-text text-transparent">
                   extraordinary travel plans.
                 </span>
               </h1>
@@ -219,11 +219,11 @@ export default function Home() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <PhotoCard
                   src={a}
-                  className="min-h-[240px] sm:row-span-2 sm:min-h-full"
+                  className="min-h-60 sm:row-span-2 sm:min-h-full"
                   badge="Top destinations"
                 />
-                <PhotoCard src={b} className="min-h-[170px]" badge="Culture & food" />
-                <PhotoCard src={c} className="min-h-[170px]" badge="Nature & escape" />
+                <PhotoCard src={b} className="min-h-42.5" badge="Culture & food" />
+                <PhotoCard src={c} className="min-h-42.5" badge="Nature & escape" />
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -232,7 +232,7 @@ export default function Home() {
                   subtitle="No bookings. Just destination-first trip creation."
                   badge="Clear identity"
                 />
-                <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-600 to-blue-700 p-4 text-white shadow-lg">
+                <div className="rounded-3xl border border-sky-100 bg-linear-to-br from-sky-600 to-blue-700 p-4 text-white shadow-lg">
                   <div className="text-sm font-bold">Premium planner feel</div>
                   <div className="mt-1 text-xs text-white/80">
                     Strong visuals, smart sections, and a cleaner project story.
@@ -247,7 +247,7 @@ export default function Home() {
       </section>
 
       {/* CORE VALUE STRIP */}
-      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white px-6 py-5 shadow-sm sm:px-8">
+      <section className="overflow-hidden rounded-4xl border border-slate-200 bg-white px-6 py-5 shadow-sm sm:px-8">
         <div className="flex flex-wrap items-center justify-center gap-3">
           {[
             "AI itinerary builder",
@@ -385,7 +385,7 @@ export default function Home() {
                   className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/15 to-transparent" />
                 <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
                   <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
                     {d.badge}
@@ -461,7 +461,7 @@ export default function Home() {
       {/* SHOWCASE */}
       <section className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-5">
-          <Card className="h-full overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+          <Card className="h-full overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-sm">
             <CardBody className="flex h-full flex-col justify-between space-y-6">
               <div>
                 <div className="inline-flex rounded-full border border-slate-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
@@ -500,14 +500,14 @@ export default function Home() {
         </div>
 
         <div className="lg:col-span-7">
-          <div className="group relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_60px_-30px_rgba(15,23,42,0.35)]">
+          <div className="group relative overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-[0_18px_60px_-30px_rgba(15,23,42,0.35)]">
             <img
               src={STOCK.visual}
               alt="Travel inspiration"
-              className="h-[440px] w-full object-cover transition duration-700 group-hover:scale-105"
+              className="h-110 w-full object-cover transition duration-700 group-hover:scale-105"
               loading="lazy"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
 
             <div className="absolute left-5 right-5 top-5 flex flex-wrap gap-3">
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
@@ -540,11 +540,11 @@ export default function Home() {
       </section>
 
       {/* FINAL CTA */}
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-gradient-to-br from-sky-700 via-blue-700 to-indigo-800 p-8 text-white shadow-[0_20px_80px_-30px_rgba(15,23,42,0.5)] sm:p-10">
+      <section className="relative overflow-hidden rounded-4xl border border-slate-200 bg-linear-to-br from-sky-700 via-blue-700 to-indigo-800 p-8 text-white shadow-[0_20px_80px_-30px_rgba(15,23,42,0.5)] sm:p-10">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -left-16 top-0 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -bottom-10 -right-5 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
-          <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:30px_30px]" />
+          <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] bg-size-[30px_30px]" />
         </div>
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -593,7 +593,7 @@ function PhotoCard({ src, badge, className = "" }) {
         className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
         loading="lazy"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+      <div className="absolute inset-0 bg-linear-to-t from-black/65 via-black/10 to-transparent" />
       <div className="absolute left-3 right-3 top-3 flex justify-between">
         <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
           {badge}

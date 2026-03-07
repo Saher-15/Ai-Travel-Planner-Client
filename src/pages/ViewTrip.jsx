@@ -20,6 +20,18 @@ const clamp = (s, n = 120) => {
   return str.length > n ? `${str.slice(0, n - 1)}…` : str;
 };
 
+function normalizeTripMode(mode) {
+  return mode === "multi" ? "multi" : "single";
+}
+
+function getTripDestinations(trip) {
+  if (Array.isArray(trip?.destinations) && trip.destinations.length) {
+    return trip.destinations.filter(Boolean);
+  }
+
+  return trip?.destination ? [trip.destination] : [];
+}
+
 function extractUniqueLocations(itinerary) {
   const rows =
     itinerary?.days?.flatMap((d) =>
@@ -27,8 +39,9 @@ function extractUniqueLocations(itinerary) {
         (d?.[block] ?? [])
           .map((a) => ({
             day: d.day,
-            timeBlock: block,
+            date: d.date,
             title: a?.title || "Place",
+            timeBlock: block,
             location: (a?.location || "").trim(),
           }))
           .filter((x) => x.location)
@@ -297,6 +310,9 @@ export default function ViewTrip() {
   const tripState = useAsync(async () => (await api.get(`/trips/${id}`)).data, [id]);
   const trip = tripState.data;
   const summary = trip?.itinerary?.tripSummary || {};
+  const tripMode = normalizeTripMode(trip?.tripMode);
+  const destinations = getTripDestinations(trip);
+  const primaryDestination = destinations[0] || trip?.destination || "";
 
   const pdfRef = useRef(null);
 
@@ -335,7 +351,7 @@ export default function ViewTrip() {
   const recommendedGeoState = useGeoPoints(recommendedPlaces);
   const recommendedPoints = recommendedGeoState.data?.points ?? [];
 
-  const weatherState = useDestinationWeather(trip?.destination, mapPoints[0]);
+  const weatherState = useDestinationWeather(primaryDestination, mapPoints[0]);
 
   if (tripState.loading) return <TripSkeleton />;
 
@@ -361,17 +377,27 @@ export default function ViewTrip() {
         <Header
           trip={trip}
           summary={summary}
+          tripMode={tripMode}
+          destinations={destinations}
           onBack={() => nav("/trips")}
           onNew={() => nav("/create")}
           onEdit={() => nav(`/trip/${id}/edit`)}
           onDownload={downloadPDF}
         />
 
-        <TripOverview trip={trip} summary={summary} />
+        <TripOverview
+          trip={trip}
+          summary={summary}
+          tripMode={tripMode}
+          destinations={destinations}
+        />
+
+        <CityPlanSection summary={summary} tripMode={tripMode} destinations={destinations} />
 
         <WeatherSection
           state={weatherState}
-          destination={trip?.destination}
+          destination={primaryDestination}
+          tripMode={tripMode}
         />
 
         <EventsSection events={trip?.events || []} />
@@ -414,7 +440,14 @@ export default function ViewTrip() {
       </div>
 
       <Card className="relative z-0 overflow-hidden">
-        <CardHeader title="Destination Map" subtitle="Places and route from your itinerary" />
+        <CardHeader
+          title="Destination Map"
+          subtitle={
+            tripMode === "multi"
+              ? "Places and route across your multi-city itinerary"
+              : "Places and route from your itinerary"
+          }
+        />
 
         <CardBody className="space-y-4">
           {geoState.error ? <Alert type="error">{geoState.error}</Alert> : null}
@@ -497,21 +530,36 @@ export default function ViewTrip() {
   );
 }
 
-function Header({ trip, summary, onBack, onNew, onEdit, onDownload }) {
+function Header({ trip, summary, tripMode, destinations, onBack, onNew, onEdit, onDownload }) {
   return (
     <Card className="relative z-50 isolate overflow-hidden">
       <div className="pointer-events-auto relative z-50 bg-gradient-to-r from-sky-700 via-blue-700 to-indigo-800 text-white">
         <div className="flex flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-white/80">
-              Your Trip
+              {tripMode === "multi" ? "Your Multi-City Trip" : "Your Trip"}
             </div>
+
             <div className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
               {trip?.destination || "Trip"}
             </div>
+
             <div className="mt-2 text-sm text-white/85">
               {fmtRange(trip?.startDate, trip?.endDate)}
             </div>
+
+            {tripMode === "multi" && destinations.length > 1 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {destinations.map((city) => (
+                  <span
+                    key={city}
+                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white"
+                  >
+                    {city}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2 md:justify-end">
@@ -520,16 +568,25 @@ function Header({ trip, summary, onBack, onNew, onEdit, onDownload }) {
                 {summary.days} days
               </Badge>
             ) : null}
+
+            {tripMode === "multi" ? (
+              <Badge className="border-white/20 bg-white/10 text-white">
+                {destinations.length} cities
+              </Badge>
+            ) : null}
+
             {summary.style ? (
               <Badge className="border-white/20 bg-white/10 text-white">
                 pace: {summary.style}
               </Badge>
             ) : null}
+
             {summary.budget ? (
               <Badge className="border-white/20 bg-white/10 text-white">
                 budget: {summary.budget}
               </Badge>
             ) : null}
+
             {!!trip?.events?.length ? (
               <Badge className="border-white/20 bg-white/10 text-white">
                 {trip.events.length} events
@@ -578,7 +635,7 @@ function Header({ trip, summary, onBack, onNew, onEdit, onDownload }) {
   );
 }
 
-function TripOverview({ trip, summary }) {
+function TripOverview({ trip, summary, tripMode, destinations }) {
   const preferences = trip?.preferences || {};
   const interests = Array.isArray(preferences?.interests) ? preferences.interests : [];
 
@@ -590,11 +647,32 @@ function TripOverview({ trip, summary }) {
       />
       <CardBody className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <InfoTile label="Destination" value={trip?.destination || "—"} />
+          <InfoTile
+            label={tripMode === "multi" ? "Trip mode" : "Destination"}
+            value={tripMode === "multi" ? "Multi-city" : trip?.destination || "—"}
+          />
           <InfoTile label="Dates" value={fmtRange(trip?.startDate, trip?.endDate) || "—"} />
           <InfoTile label="Pace" value={summary?.style || preferences?.pace || "—"} />
           <InfoTile label="Budget" value={summary?.budget || preferences?.budget || "—"} />
         </div>
+
+        {tripMode === "multi" && destinations.length > 1 ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              Cities in this trip
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {destinations.map((city) => (
+                <span
+                  key={city}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                >
+                  {city}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {!!interests.length && (
           <div>
@@ -622,6 +700,51 @@ function TripOverview({ trip, summary }) {
             <div className="mt-2 text-sm leading-6 text-slate-700">{preferences.notes}</div>
           </div>
         ) : null}
+      </CardBody>
+    </Card>
+  );
+}
+
+function CityPlanSection({ summary, tripMode, destinations }) {
+  const cityPlan = Array.isArray(summary?.cityPlan) ? summary.cityPlan : [];
+
+  if (tripMode !== "multi" || !destinations.length) return null;
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="City Plan"
+        subtitle="How your days are distributed across the cities in this trip"
+        right={<Badge>{destinations.length} cities</Badge>}
+      />
+      <CardBody>
+        {cityPlan.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {cityPlan.map((segment, index) => (
+              <div
+                key={`${segment.city}-${index}`}
+                className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  City {index + 1}
+                </div>
+                <div className="mt-1 text-base font-bold text-slate-900">
+                  {segment.city}
+                </div>
+                <div className="mt-2 text-sm text-slate-600">
+                  {segment.days} day{segment.days > 1 ? "s" : ""}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {fmtRange(segment.startDate, segment.endDate)}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            This is a multi-city trip with {destinations.length} cities.
+          </div>
+        )}
       </CardBody>
     </Card>
   );
@@ -717,7 +840,7 @@ function EventsSection({ events }) {
   );
 }
 
-function WeatherSection({ state, destination }) {
+function WeatherSection({ state, destination, tripMode }) {
   if (state.loading) {
     return (
       <Card className="overflow-hidden">
@@ -759,7 +882,11 @@ function WeatherSection({ state, destination }) {
     <Card className="overflow-hidden">
       <CardHeader
         title="Weather Preview"
-        subtitle={`Current forecast for ${state.data?.name || destination || "your destination"}`}
+        subtitle={
+          tripMode === "multi"
+            ? `Current forecast for your first city: ${state.data?.name || destination || "destination"}`
+            : `Current forecast for ${state.data?.name || destination || "your destination"}`
+        }
         right={
           <Badge className="border-sky-200 bg-sky-50 text-sky-700">
             Live weather
