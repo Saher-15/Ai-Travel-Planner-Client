@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, CardBody, Badge, Input, Select } from "../components/UI.jsx";
+import { Button, Card, CardBody, Badge } from "../components/UI.jsx";
 
 const cx = (...c) => c.filter(Boolean).join(" ");
 
@@ -8,63 +8,61 @@ const STOCK = {
   hero: [
     "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80",
     "https://images.unsplash.com/photo-1526779259212-939e64788e3c?auto=format&fit=crop&w=1600&q=80",
-    "https://images.unsplash.com/photo-1518684079-4c3b23f1f3f4?auto=format&fit=crop&w=1600&q=80",
-  ],
-  map: "https://images.unsplash.com/photo-1526772662000-3f88f10405ff?auto=format&fit=crop&w=1600&q=80",
+  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80",  ],
+  visual:
+    "https://images.unsplash.com/photo-1526772662000-3f88f10405ff?auto=format&fit=crop&w=1600&q=80",
 };
-
-const SEARCH_TABS = ["Flights", "Hotels", "Stays", "Activities"];
 
 const features = [
   {
-    title: "AI day-by-day planning",
-    text: "Generate balanced itineraries with morning, afternoon, and evening blocks that feel practical and real.",
+    title: "AI day-by-day itinerary",
+    text: "Generate practical travel plans with structured morning, afternoon, and evening activities.",
     icon: "✨",
   },
   {
-    title: "Smart trip pacing",
-    text: "Choose relaxed, moderate, or packed travel style and let your trip structure adapt automatically.",
+    title: "Smart travel pacing",
+    text: "Build trips that match different travel rhythms like relaxed, balanced, or packed adventures.",
     icon: "⚡",
   },
   {
-    title: "Save and manage trips",
-    text: "Keep your trips in one place, revisit them anytime, and build your own personal travel library.",
+    title: "Save your journeys",
+    text: "Keep all your travel plans in one place and revisit them anytime from your trip library.",
     icon: "📁",
   },
   {
-    title: "Visual trip experience",
-    text: "Create a planning flow that feels interactive, premium, and closer to a real-world travel platform.",
+    title: "Visual planning experience",
+    text: "Enjoy a premium planner interface that feels modern, clean, and inspiring.",
     icon: "🗺️",
   },
 ];
 
-const stats = [
-  { label: "Fast generation", value: "10–30s", sub: "average itinerary build time" },
-  { label: "Daily structure", value: "3 blocks", sub: "morning / afternoon / evening" },
-  { label: "Trip library", value: "Unlimited", sub: "save as many trips as you want" },
-  { label: "Planning feel", value: "Premium", sub: "clean modern product experience" },
+const highlights = [
+  "AI itinerary generation",
+  "Portfolio-ready planner UI",
+  "Destination-focused experience",
 ];
 
-const highlights = [
-  "Premium travel-planner UI",
-  "Smart Create Trip integration",
-  "Portfolio-ready visual design",
+const stats = [
+  { label: "Generation speed", value: "Fast", sub: "quick itinerary creation flow" },
+  { label: "Daily structure", value: "3 blocks", sub: "morning / afternoon / evening" },
+  { label: "Trip management", value: "Easy", sub: "save and revisit your plans" },
+  { label: "Experience", value: "Premium", sub: "modern clean planner design" },
 ];
 
 const steps = [
   {
-    title: "Choose destination",
-    text: "Enter where you want to go and define your dates.",
+    title: "Choose your destination",
+    text: "Start with the place you want to visit and define your travel dates.",
     number: "01",
   },
   {
     title: "Set your travel style",
-    text: "Pick your trip type, travelers, and planning focus.",
+    text: "Decide how you want your journey to feel before generating the itinerary.",
     number: "02",
   },
   {
-    title: "Generate your itinerary",
-    text: "Jump to Create Trip and let AI build the full plan.",
+    title: "Generate the trip plan",
+    text: "Let the planner create a structured and inspiring trip for your journey.",
     number: "03",
   },
 ];
@@ -72,162 +70,121 @@ const steps = [
 const POPULAR_DESTINATIONS = [
   {
     name: "Paris, France",
-    tag: "Romantic escapes",
-    priceFrom: "$320",
+    tag: "Romantic city energy",
     image:
       "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80",
-    badge: "Trending",
+    badge: "Inspiration",
   },
   {
     name: "Tokyo, Japan",
-    tag: "City & culture",
-    priceFrom: "$540",
+    tag: "Modern culture & food",
     image:
       "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=1200&q=80",
-    badge: "Top pick",
+    badge: "Popular",
   },
   {
     name: "Bali, Indonesia",
-    tag: "Beach & nature",
-    priceFrom: "$410",
+    tag: "Nature & calm escape",
     image:
-      "https://images.unsplash.com/photo-1500534314211-0a24cd03f2c0?auto=format&fit=crop&w=1200&q=80",
-    badge: "Great value",
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
+    badge: "Relaxed",
   },
   {
     name: "New York, USA",
-    tag: "Urban adventures",
-    priceFrom: "$280",
+    tag: "Urban discovery",
     image:
       "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80",
-    badge: "Popular",
+    badge: "City trip",
   },
 ];
 
-const DEALS = [
+const plannerBenefits = [
+  "Cleaner project identity",
+  "More relevant user experience",
+  "Stronger AI travel planner branding",
+  "Better portfolio and recruiter impression",
+];
+
+const travelModes = [
   {
-    title: "Weekend city breaks",
-    desc: "Short getaways with optimized plans and quick day-by-day structure.",
-    discount: "Up to 25% off",
-    tag: "Limited time",
-    preset: { tripType: "round", sourceTab: "Flights" },
+    title: "Relaxed planner",
+    text: "For travelers who want slower days, fewer stops, and more breathing space.",
+    icon: "🌿",
   },
   {
-    title: "Long-stay workations",
-    desc: "Longer stays with a slower pace and more balanced daily flow.",
-    discount: "Save on stays",
-    tag: "Remote-friendly",
-    preset: { tripType: "standard", sourceTab: "Stays" },
+    title: "Balanced explorer",
+    text: "For travelers who want a healthy mix of attractions, food, and free time.",
+    icon: "🧭",
   },
   {
-    title: "Multi-city adventures",
-    desc: "Create stronger journeys with flexible routing and a richer travel story.",
-    discount: "Smart routing",
-    tag: "Advanced",
-    preset: { tripType: "multi", sourceTab: "Flights" },
+    title: "Packed adventure",
+    text: "For travelers who want to maximize the day and explore more locations.",
+    icon: "🔥",
   },
 ];
 
 export default function Home() {
   const nav = useNavigate();
   const [a, b, c] = useMemo(() => STOCK.hero, []);
-  const [activeTab, setActiveTab] = useState("Flights");
-
-  const [search, setSearch] = useState({
-    from: "",
-    to: "",
-    checkIn: "",
-    checkOut: "",
-    travelers: "2",
-    tripType: "round",
-  });
-
-  const onSearchChange = (field, value) => {
-    setSearch((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const buildCreateTripUrl = ({
-    destination = "",
-    startDate = "",
-    endDate = "",
-    travelers = "2",
-    sourceTab = "Flights",
-    tripType = "",
-    from = "",
-  } = {}) => {
-    const params = new URLSearchParams();
-
-    if (destination) params.set("destination", destination);
-    if (startDate) params.set("startDate", startDate);
-    if (endDate) params.set("endDate", endDate);
-    if (travelers) params.set("travelers", travelers);
-    if (sourceTab) params.set("sourceTab", sourceTab);
-    if (tripType) params.set("tripType", tripType);
-    if (from) params.set("from", from);
-
-    return `/create?${params.toString()}`;
-  };
 
   const goToCreate = (payload = {}) => {
-    nav(buildCreateTripUrl(payload));
-  };
+    const params = new URLSearchParams();
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
+    if (payload.destination) params.set("destination", payload.destination);
+    if (payload.travelers) params.set("travelers", payload.travelers);
+    if (payload.tripType) params.set("tripType", payload.tripType);
 
-    const isStaySearch = activeTab === "Hotels" || activeTab === "Stays";
-    const destinationValue = isStaySearch ? search.from.trim() : search.to.trim();
-
-    goToCreate({
-      destination: destinationValue,
-      startDate: search.checkIn,
-      endDate: search.checkOut,
-      travelers: search.travelers,
-      sourceTab: activeTab,
-      tripType: search.tripType,
-      from: !isStaySearch ? search.from.trim() : "",
-    });
+    nav(`/create?${params.toString()}`);
   };
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-20">
       {/* HERO */}
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_80px_-30px_rgba(15,23,42,0.22)]">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-blue-50" />
-          <div className="absolute -left-16 -top-16 h-72 w-72 rounded-full bg-sky-200/40 blur-3xl" />
-          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-indigo-200/30 blur-3xl" />
-          <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-100/40 blur-3xl" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.95),transparent_36%)]" />
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_30px_100px_-35px_rgba(15,23,42,0.35)]">
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_30%),linear-gradient(to_bottom_right,#f8fbff,#ffffff,#f2f8ff)]" />
+          <div className="absolute -left-10 top-0 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl" />
+          <div className="absolute right-0 top-16 h-80 w-80 rounded-full bg-indigo-200/25 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-100/30 blur-3xl" />
+          <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:32px_32px]" />
         </div>
 
         <div className="relative grid gap-10 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-12 lg:px-10 lg:py-14">
           {/* LEFT */}
-          <div className="lg:col-span-6 lg:pr-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-white/90 px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
-              AI-powered itinerary planner
+          <div className="lg:col-span-7">
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-white/90 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.9)]" />
+              AI-powered travel planner
             </div>
 
-            <div className="mt-6 max-w-2xl">
-              <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                Plan smarter.
-                <span className="mt-1 block bg-gradient-to-r from-sky-700 via-blue-600 to-indigo-500 bg-clip-text text-transparent">
-                  Travel better.
+            <div className="mt-6 max-w-3xl">
+              <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-6xl xl:text-7xl">
+                Turn ideas into
+                <span className="mt-2 block bg-gradient-to-r from-sky-700 via-blue-600 to-indigo-500 bg-clip-text text-transparent">
+                  extraordinary travel plans.
                 </span>
               </h1>
 
-              <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
-                Turn simple travel ideas into polished itineraries with a premium
-                planning experience. Pick your destination, travel dates, and trip
-                style, then jump straight into your Create Trip page with the details
-                already prepared.
+              <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
+                Build beautiful AI-generated itineraries without booking clutter.
+                Focus on destination inspiration, smart daily planning, and a premium
+                experience from the first click.
               </p>
             </div>
 
-            
+            <div className="mt-6 flex flex-wrap gap-3">
+              {highlights.map((item) => (
+                <div
+                  key={item}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur"
+                >
+                  <span className="text-emerald-600">✓</span>
+                  {item}
+                </div>
+              ))}
+            </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button className="w-full sm:w-auto" onClick={() => nav("/create")}>
                 Start Planning
               </Button>
@@ -240,25 +197,13 @@ export default function Home() {
               </Button>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              {highlights.map((item) => (
-                <div
-                  key={item}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-700 shadow-sm"
-                >
-                  <span className="text-emerald-600">✓</span>
-                  {item}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {stats.map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-3xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-md"
+                  className="rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-lg"
                 >
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                     {item.label}
                   </div>
                   <div className="mt-2 text-2xl font-black text-slate-900">{item.value}</div>
@@ -269,56 +214,72 @@ export default function Home() {
           </div>
 
           {/* RIGHT */}
-          <div className="lg:col-span-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <PhotoCard
-                src={a}
-                className="min-h-[240px] sm:row-span-2 sm:min-h-full"
-                badge="Top destinations"
-              />
-              <PhotoCard src={b} className="min-h-[170px]" badge="Food & culture" />
-              <PhotoCard src={c} className="min-h-[170px]" badge="Nature & escape" />
-            </div>
+          <div className="lg:col-span-5">
+            <div className="relative">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <PhotoCard
+                  src={a}
+                  className="min-h-[240px] sm:row-span-2 sm:min-h-full"
+                  badge="Top destinations"
+                />
+                <PhotoCard src={b} className="min-h-[170px]" badge="Culture & food" />
+                <PhotoCard src={c} className="min-h-[170px]" badge="Nature & escape" />
+              </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-bold text-slate-900">Trip setup</div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      destination • dates • trip type • travelers
-                    </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <InfoCard
+                  title="Focused planning"
+                  subtitle="No bookings. Just destination-first trip creation."
+                  badge="Clear identity"
+                />
+                <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-600 to-blue-700 p-4 text-white shadow-lg">
+                  <div className="text-sm font-bold">Premium planner feel</div>
+                  <div className="mt-1 text-xs text-white/80">
+                    Strong visuals, smart sections, and a cleaner project story.
                   </div>
-                  <Badge>Smart inputs</Badge>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-600 to-blue-700 p-4 text-white shadow-sm">
-                <div className="text-sm font-bold">Stronger portfolio feel</div>
-                <div className="mt-1 text-xs text-white/80">
-                  Cleaner visuals, better UX, stronger first impression
-                </div>
-              </div>
+
             </div>
           </div>
         </div>
       </section>
 
-      {/* TRUST */}
+      {/* CORE VALUE STRIP */}
+      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white px-6 py-5 shadow-sm sm:px-8">
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {[
+            "AI itinerary builder",
+            "Smart daily trip flow",
+            "Visual travel inspiration",
+            "Saved trips experience",
+          ].map((item) => (
+            <span
+              key={item}
+              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* TRUST / PROJECT VALUE */}
       <section className="grid gap-4 md:grid-cols-3">
         <TrustItem
-          title="Secure experience"
-          text="Protected routes and account-based trip management make your app feel more complete and real."
-          icon="🔐"
+          title="Clear project identity"
+          text="Your homepage now matches what your app really does: creating smart travel plans."
+          icon="🎯"
         />
         <TrustItem
-          title="Modern product design"
-          text="Reusable UI, cleaner spacing, strong cards, and premium visual hierarchy across the page."
+          title="Better user experience"
+          text="Users instantly understand the product without getting distracted by fake booking features."
           icon="🎨"
         />
         <TrustItem
-          title="Built to impress"
-          text="A stronger homepage gives your project more impact for demos, recruiters, and GitHub visitors."
+          title="Stronger portfolio impact"
+          text="A focused planner product looks more professional in demos, GitHub, and interviews."
           icon="🚀"
         />
       </section>
@@ -330,11 +291,11 @@ export default function Home() {
             How it works
           </div>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-            A simple flow with a premium planning feel
+            A simple journey from inspiration to itinerary
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
-            Your homepage should guide users naturally toward Create Trip instead of
-            feeling like a static landing page.
+          <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
+            Your homepage should guide visitors naturally into creating a trip, not
+            feel like a reservation marketplace.
           </p>
         </div>
 
@@ -342,14 +303,49 @@ export default function Home() {
           {steps.map((step) => (
             <Card
               key={step.number}
-              className="rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-24px_rgba(15,23,42,0.28)]"
+              className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-28px_rgba(15,23,42,0.3)]"
+            >
+              <CardBody className="relative space-y-4">
+                <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-sky-100 blur-2xl transition duration-300 group-hover:bg-sky-200" />
+                <div className="relative">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-600 text-sm font-black text-white shadow-sm">
+                    {step.number}
+                  </div>
+                  <div className="mt-4 text-lg font-black text-slate-900">{step.title}</div>
+                  <div className="mt-2 text-sm leading-6 text-slate-600">{step.text}</div>
+                </div>
+              </CardBody>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* PLANNING MODES */}
+      <section className="space-y-6">
+        <div className="max-w-2xl">
+          <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+            Planning styles
+          </div>
+          <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
+            Choose how the trip should feel
+          </h2>
+          <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
+            These blocks make the planner feel smarter and more personalized.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {travelModes.map((mode) => (
+            <Card
+              key={mode.title}
+              className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-28px_rgba(15,23,42,0.3)]"
             >
               <CardBody className="space-y-4">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-600 text-sm font-black text-white shadow-sm">
-                  {step.number}
+                <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-2xl shadow-sm">
+                  {mode.icon}
                 </div>
-                <div className="text-lg font-black text-slate-900">{step.title}</div>
-                <div className="text-sm leading-6 text-slate-600">{step.text}</div>
+                <div className="text-lg font-black text-slate-900">{mode.title}</div>
+                <div className="text-sm leading-6 text-slate-600">{mode.text}</div>
               </CardBody>
             </Card>
           ))}
@@ -361,19 +357,18 @@ export default function Home() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="max-w-2xl">
             <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-              Popular destinations
+              Destination inspiration
             </div>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-              Browse a destination, then jump straight into planning
+              Pick a place and jump directly into planning
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
-              Each card can send the user directly to Create Trip with the destination
-              already filled in.
+            <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
+              Each card acts as an inspiration-first shortcut to your Create Trip page.
             </p>
           </div>
 
           <Button variant="secondary" className="text-xs sm:text-sm" onClick={() => nav("/create")}>
-            Start from blank trip
+            Start a blank trip
           </Button>
         </div>
 
@@ -381,104 +376,47 @@ export default function Home() {
           {POPULAR_DESTINATIONS.map((d) => (
             <Card
               key={d.name}
-              className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-24px_rgba(15,23,42,0.28)]"
+              className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-28px_rgba(15,23,42,0.3)]"
             >
-              <div className="relative h-44 overflow-hidden">
+              <div className="relative h-52 overflow-hidden">
                 <img
                   src={d.image}
                   alt={d.name}
-                  className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                  className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
                 <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
                   <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
                     {d.badge}
                   </span>
-                  <span className="rounded-full bg-black/40 px-2 py-1 text-[11px] font-medium text-white">
-                    From {d.priceFrom}
-                  </span>
+                </div>
+                <div className="absolute bottom-3 left-3 right-3">
+                  <div className="text-lg font-black text-white">{d.name}</div>
+                  <div className="text-xs text-white/80">{d.tag}</div>
                 </div>
               </div>
 
-              <CardBody className="space-y-2">
-                <div className="text-sm font-bold text-slate-900">{d.name}</div>
-                <div className="text-xs text-slate-500">{d.tag}</div>
-
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <Button
-                    className="px-3 py-2 text-xs"
-                    onClick={() =>
-                      goToCreate({
-                        destination: d.name,
-                        sourceTab: "Flights",
-                        travelers: "2",
-                        tripType: "round",
-                      })
-                    }
-                  >
-                    Plan trip here
-                  </Button>
-
-                  <span className="text-[11px] text-slate-500">
-                    Destination pre-filled
+              <CardBody className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Inspiration ready
                   </span>
-                </div>
-              </CardBody>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* DEALS / TEMPLATES */}
-      <section className="space-y-6">
-        <div className="max-w-2xl">
-          <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-            Templates & offers
-          </div>
-          <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-            Add more travel-platform energy to your homepage
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
-            These blocks make the project feel richer and also give users faster
-            entry points into the Create Trip flow.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {DEALS.map((deal) => (
-            <Card
-              key={deal.title}
-              className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-24px_rgba(15,23,42,0.28)]"
-            >
-              <CardBody className="relative space-y-3">
-                <div className="absolute right-4 top-4">
-                  <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-                    {deal.tag}
-                  </Badge>
+                  <Badge>{d.badge}</Badge>
                 </div>
 
-                <div className="text-sm font-black text-slate-900">{deal.title}</div>
-                <div className="text-xs leading-6 text-slate-600">{deal.desc}</div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs font-semibold text-emerald-700">
-                    {deal.discount}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    className="px-3 py-2 text-xs"
-                    onClick={() =>
-                      goToCreate({
-                        sourceTab: deal.preset.sourceTab,
-                        tripType: deal.preset.tripType,
-                        travelers: "2",
-                      })
-                    }
-                  >
-                    Use template
-                  </Button>
-                </div>
+                <Button
+                  className="w-full"
+                  onClick={() =>
+                    goToCreate({
+                      destination: d.name,
+                      travelers: "2",
+                      tripType: "round",
+                    })
+                  }
+                >
+                  Plan this destination
+                </Button>
               </CardBody>
             </Card>
           ))}
@@ -492,10 +430,10 @@ export default function Home() {
             Powerful features
           </div>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-            Everything you need for a stronger planner
+            Everything your planner needs
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
-            Designed to make your travel app feel more complete, polished, and useful.
+          <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
+            Focused features make your product feel more complete and more believable.
           </p>
         </div>
 
@@ -503,7 +441,7 @@ export default function Home() {
           {features.map((f) => (
             <Card
               key={f.title}
-              className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-24px_rgba(15,23,42,0.28)]"
+              className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-28px_rgba(15,23,42,0.3)]"
             >
               <CardBody className="relative">
                 <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-sky-100 blur-2xl transition duration-300 group-hover:bg-sky-200" />
@@ -527,27 +465,21 @@ export default function Home() {
             <CardBody className="flex h-full flex-col justify-between space-y-6">
               <div>
                 <div className="inline-flex rounded-full border border-slate-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                  Product-style homepage
+                  Focused product identity
                 </div>
 
                 <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-900">
-                  Make your app feel like a serious SaaS product
+                  A homepage that truly matches your planner
                 </h3>
 
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  A stronger homepage improves your first impression instantly. It
-                  makes your app feel more complete, more premium, and more ready for
-                  demos or interviews.
+                  Removing irrelevant booking sections makes your app cleaner,
+                  smarter, and much more convincing as a real AI travel planner.
                 </p>
               </div>
 
               <div className="space-y-3">
-                {[
-                  "Better visual hierarchy",
-                  "Stronger CTA flow into Create Trip",
-                  "More premium card layout",
-                  "Cleaner recruiter-ready presentation",
-                ].map((item) => (
+                {plannerBenefits.map((item) => (
                   <div
                     key={item}
                     className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
@@ -570,19 +502,22 @@ export default function Home() {
         <div className="lg:col-span-7">
           <div className="group relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_60px_-30px_rgba(15,23,42,0.35)]">
             <img
-              src={STOCK.map}
-              alt="Destination preview"
-              className="h-[420px] w-full object-cover transition duration-700 group-hover:scale-105"
+              src={STOCK.visual}
+              alt="Travel inspiration"
+              className="h-[440px] w-full object-cover transition duration-700 group-hover:scale-105"
               loading="lazy"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-900/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
 
             <div className="absolute left-5 right-5 top-5 flex flex-wrap gap-3">
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                Destination preview
+                Inspiration first
               </span>
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                Strong visual planning
+                AI planning
+              </span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                Premium UX
               </span>
             </div>
 
@@ -592,11 +527,11 @@ export default function Home() {
                   Visual experience
                 </div>
                 <div className="mt-2 text-2xl font-black">
-                  See the destination feeling before the itinerary is even created
+                  Inspire the trip before generating the journey
                 </div>
                 <div className="mt-2 text-sm leading-6 text-white/85">
-                  Strong visuals plus AI planning create a homepage that feels much
-                  closer to a real travel platform.
+                  The homepage now feels more like a premium planning product and less
+                  like a generic booking website.
                 </div>
               </div>
             </div>
@@ -609,6 +544,7 @@ export default function Home() {
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -left-16 top-0 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -bottom-10 -right-5 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:30px_30px]" />
         </div>
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -617,11 +553,11 @@ export default function Home() {
               Ready to begin?
             </div>
             <h3 className="mt-4 text-3xl font-black tracking-tight">
-              Start building your next unforgettable trip
+              Start planning your next unforgettable journey
             </h3>
             <p className="mt-2 text-sm leading-7 text-white/80 sm:text-base">
-              Choose your destination, set your dates, and move directly into the
-              Create Trip page with a cleaner and smarter flow.
+              Choose a destination, shape the travel style, and generate a smarter
+              itinerary with a homepage that truly fits your project.
             </p>
           </div>
 
@@ -657,7 +593,7 @@ function PhotoCard({ src, badge, className = "" }) {
         className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
         loading="lazy"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
       <div className="absolute left-3 right-3 top-3 flex justify-between">
         <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
           {badge}
@@ -667,6 +603,20 @@ function PhotoCard({ src, badge, className = "" }) {
         <div className="rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white/95 backdrop-blur">
           Inspiring places, smarter planning
         </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoCard({ title, subtitle, badge }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-bold text-slate-900">{title}</div>
+          <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
+        </div>
+        <Badge>{badge}</Badge>
       </div>
     </div>
   );

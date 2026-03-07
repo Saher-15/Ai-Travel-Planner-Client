@@ -102,6 +102,102 @@ function UserPill({ user }) {
   );
 }
 
+function FooterLink({ to, children }) {
+  return (
+    <Link
+      to={to}
+      className="text-sm text-slate-500 transition hover:text-sky-700"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function Footer({ isLoggedIn, isAdmin }) {
+  return (
+    <footer className="mt-12 border-t border-slate-200 bg-white/80 backdrop-blur">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+        <div className="grid gap-10 md:grid-cols-2 xl:grid-cols-4">
+          {/* BRAND */}
+          <div className="space-y-4">
+            <Link to="/" className="inline-flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-[0_10px_30px_-12px_rgba(37,99,235,0.45)]">
+                <span className="text-sm font-extrabold tracking-tight">TP</span>
+              </div>
+
+              <div>
+                <div className="text-base font-black tracking-tight text-slate-900">
+                  Travel Planner
+                </div>
+                <div className="text-xs text-slate-500">
+                  Smart trip planning made easy
+                </div>
+              </div>
+            </Link>
+
+            <p className="max-w-sm text-sm leading-6 text-slate-600">
+              Create smart travel itineraries, organize your journeys, and enjoy a
+              clean premium planning experience focused on inspiration and structure.
+            </p>
+          </div>
+
+          {/* NAVIGATION */}
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
+              Navigation
+            </h3>
+            <div className="mt-4 flex flex-col gap-3">
+              <FooterLink to="/">Home</FooterLink>
+              <FooterLink to="/create">Create Trip</FooterLink>
+              {isLoggedIn ? <FooterLink to="/trips">My Trips</FooterLink> : null}
+              <FooterLink to="/contact">Contact</FooterLink>
+              {isLoggedIn ? <FooterLink to="/profile">Profile</FooterLink> : null}
+              {isAdmin ? <FooterLink to="/admin/contacts">Admin</FooterLink> : null}
+            </div>
+          </div>
+
+          {/* PRODUCT */}
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
+              Planner
+            </h3>
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <p>AI itinerary generation</p>
+              <p>Smart daily planning flow</p>
+              <p>Destination-first experience</p>
+              <p>Saved personal trip library</p>
+            </div>
+          </div>
+
+          {/* CTA / NOTE */}
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
+              Start your next journey
+            </h3>
+            <p className="mt-4 text-sm leading-6 text-slate-600">
+              Turn your destination idea into a structured and inspiring travel plan.
+            </p>
+
+            <div className="mt-5">
+              <Link
+                to="/create"
+                className="inline-flex items-center justify-center rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-500 hover:shadow-md"
+              >
+                Create a Trip
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} Travel Planner. All rights reserved.</p>
+          <p>Designed for smarter travel planning.</p>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -281,6 +377,9 @@ export default function Layout({ children }) {
 
       {/* PAGE WRAPPER */}
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-6">{children}</main>
+
+      {/* FOOTER */}
+      <Footer isLoggedIn={isLoggedIn} isAdmin={isAdmin} />
     </div>
   );
 }
