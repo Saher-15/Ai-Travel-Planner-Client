@@ -12,6 +12,7 @@ import {
   Select,
 } from "../components/UI.jsx";
 import MapTilerMap from "../components/MapTilerMap.jsx";
+import CityAutoComplete from "../components/CityAutoComplete.jsx";
 
 const interestOptions = [
   "history",
@@ -59,13 +60,6 @@ function clampToToday(isoDate) {
   const today = todayISOPlus(0);
   if (!isoDate) return today;
   return isoDate < today ? today : isoDate;
-}
-
-function parseCities(text) {
-  return String(text || "")
-    .split("\n")
-    .map((city) => city.trim())
-    .filter(Boolean);
 }
 
 function normalizeSourceTab(tab) {
@@ -144,6 +138,27 @@ function parseTravelersParam(value) {
   }
 }
 
+function normalizePlace(place) {
+  if (!place) return null;
+
+  const placeName = String(place.placeName || place.name || "").trim();
+  if (!placeName) return null;
+
+  return {
+    id:
+      place.id ||
+      `${placeName}-${place.center?.[0] || 0}-${place.center?.[1] || 0}`,
+    name: place.name || placeName,
+    placeName,
+    center: Array.isArray(place.center) ? place.center : [],
+    country: place.country || "",
+    region: place.region || "",
+    countryCode: place.countryCode || "",
+    flag: place.flag || "🌍",
+    type: place.type || "place",
+  };
+}
+
 export default function CreateTrip() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
@@ -164,7 +179,12 @@ export default function CreateTrip() {
 
   const [tripMode, setTripMode] = useState("single");
   const [destination, setDestination] = useState(destinationParam);
-  const [multiCities, setMultiCities] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState(null);
+
+  const [multiCityInput, setMultiCityInput] = useState("");
+  const [multiCitySelectedPlace, setMultiCitySelectedPlace] = useState(null);
+  const [multiCityPlaces, setMultiCityPlaces] = useState([]);
+
   const [startDate, setStartDate] = useState(safeInitialStart);
   const [endDate, setEndDate] = useState(safeInitialEnd);
   const [pace, setPace] = useState("moderate");
@@ -189,6 +209,10 @@ export default function CreateTrip() {
         : addDays(nextStart, 1);
 
     setDestination(destinationParam || "");
+    setSelectedPlace(null);
+    setMultiCityInput("");
+    setMultiCitySelectedPlace(null);
+    setMultiCityPlaces([]);
     setStartDate(nextStart);
     setEndDate(nextEnd);
     setTravelers(parseTravelersParam(travelersParam));
@@ -231,8 +255,6 @@ export default function CreateTrip() {
     [startDate, minStartDate]
   );
 
-  const parsedCities = useMemo(() => parseCities(multiCities), [multiCities]);
-
   const travelerCount = useMemo(() => getTravelerCount(travelers), [travelers]);
   const travelerSummary = useMemo(() => getTravelerSummary(travelers), [travelers]);
 
@@ -251,27 +273,31 @@ export default function CreateTrip() {
 
   const previewTitle = useMemo(() => {
     if (tripMode === "multi") {
-      return parsedCities.length ? parsedCities.join(" → ") : "Your cities";
+      return multiCityPlaces.length
+        ? multiCityPlaces.map((city) => city.placeName).join(" → ")
+        : "Your cities";
     }
     return destination || "Your destination";
-  }, [tripMode, parsedCities, destination]);
+  }, [tripMode, multiCityPlaces, destination]);
 
   const mapQuery = useMemo(() => {
-    if (tripMode === "multi") return parsedCities[0] || "";
+    if (tripMode === "multi") return multiCityPlaces[0]?.placeName || "";
     return destination;
-  }, [tripMode, parsedCities, destination]);
+  }, [tripMode, multiCityPlaces, destination]);
 
   const formSummary = useMemo(() => {
     if (tripMode === "single" && !destination.trim()) {
       return "Start by choosing where you want to go.";
     }
 
-    if (tripMode === "multi" && parsedCities.length === 0) {
-      return "Add the cities you want to visit, one city per line.";
+    if (tripMode === "multi" && multiCityPlaces.length === 0) {
+      return "Add the cities you want to visit in order.";
     }
 
     const target =
-      tripMode === "multi" ? parsedCities.join(" → ") : destination.trim();
+      tripMode === "multi"
+        ? multiCityPlaces.map((city) => city.placeName).join(" → ")
+        : destination.trim();
 
     let summary = `A ${pace} ${daysCount || ""}-day trip to ${target}`;
     if (budget) summary += ` with a ${budget} budget`;
@@ -281,7 +307,7 @@ export default function CreateTrip() {
   }, [
     tripMode,
     destination,
-    parsedCities,
+    multiCityPlaces,
     pace,
     daysCount,
     budget,
@@ -341,11 +367,59 @@ export default function CreateTrip() {
     });
   }
 
+  function addMultiCity() {
+    const normalized = normalizePlace(multiCitySelectedPlace);
+
+    if (!normalized) {
+      setErr("Please choose a city from the suggestions, then click Add city.");
+      return;
+    }
+
+    const alreadyExists = multiCityPlaces.some(
+      (city) => city.placeName.toLowerCase() === normalized.placeName.toLowerCase()
+    );
+
+    if (alreadyExists) {
+      setErr("This city is already added.");
+      return;
+    }
+
+    setMultiCityPlaces((prev) => [...prev, normalized]);
+    setMultiCityInput("");
+    setMultiCitySelectedPlace(null);
+    setErr("");
+  }
+
+  function removeMultiCity(index) {
+    setMultiCityPlaces((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function moveMultiCityUp(index) {
+    if (index === 0) return;
+    setMultiCityPlaces((prev) => {
+      const copy = [...prev];
+      [copy[index - 1], copy[index]] = [copy[index], copy[index - 1]];
+      return copy;
+    });
+  }
+
+  function moveMultiCityDown(index) {
+    setMultiCityPlaces((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const copy = [...prev];
+      [copy[index + 1], copy[index]] = [copy[index], copy[index + 1]];
+      return copy;
+    });
+  }
+
   function resetForm() {
     const nextStart = clampToToday(startDateParam || todayISOPlus(0));
     setTripMode("single");
     setDestination(destinationParam || "");
-    setMultiCities("");
+    setSelectedPlace(null);
+    setMultiCityInput("");
+    setMultiCitySelectedPlace(null);
+    setMultiCityPlaces([]);
     setStartDate(nextStart);
     setEndDate(addDays(nextStart, 1));
     setPace("moderate");
@@ -364,15 +438,20 @@ export default function CreateTrip() {
 
     const cleanDestination = destination.trim();
     const cleanNotes = notes.trim();
-    const cities = parsedCities;
+    const cities = multiCityPlaces.map((city) => city.placeName);
 
     if (tripMode === "single" && !cleanDestination) {
       setErr("Please enter a destination.");
       return;
     }
 
-    if (tripMode === "multi" && cities.length < 2) {
-      setErr("Please enter at least 2 cities for a multi-city trip.");
+    if (tripMode === "single" && !selectedPlace) {
+      setErr("Please choose a destination from the suggestions list.");
+      return;
+    }
+
+    if (tripMode === "multi" && multiCityPlaces.length < 2) {
+      setErr("Please add at least 2 cities for a multi-city trip.");
       return;
     }
 
@@ -418,6 +497,28 @@ export default function CreateTrip() {
           includeEvents,
           eventTypes,
         },
+        placeMeta:
+          tripMode === "single" && selectedPlace
+            ? {
+              label: selectedPlace.placeName,
+              name: selectedPlace.name,
+              country: selectedPlace.country,
+              region: selectedPlace.region || "",
+              lng: selectedPlace.center?.[0] ?? null,
+              lat: selectedPlace.center?.[1] ?? null,
+            }
+            : null,
+        multiCityMeta:
+          tripMode === "multi"
+            ? multiCityPlaces.map((city) => ({
+              label: city.placeName,
+              name: city.name,
+              country: city.country,
+              region: city.region || "",
+              lng: city.center?.[0] ?? null,
+              lat: city.center?.[1] ?? null,
+            }))
+            : [],
       };
 
       const { data: trip } = await api.post("/trips/generate-and-save", payload);
@@ -425,7 +526,7 @@ export default function CreateTrip() {
     } catch (e2) {
       setErr(
         e2?.response?.data?.message ||
-          "Generate failed. Please log in and try again."
+        "Generate failed. Please log in and try again."
       );
     } finally {
       setLoading(false);
@@ -550,35 +651,134 @@ export default function CreateTrip() {
                   subtitle={
                     tripMode === "single"
                       ? "Choose the main place you want to visit"
-                      : "Enter one city per line in the order you want to visit them"
+                      : "Search and add cities in the exact order you want to visit them"
                   }
                   right={
                     tripMode === "multi" ? (
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {parsedCities.length} selected
+                        {multiCityPlaces.length} selected
                       </span>
                     ) : null
                   }
                 >
                   {tripMode === "single" ? (
-                    <Input
+                    <CityAutoComplete
                       label="Destination"
-                      placeholder="e.g., Paris, France"
+                      placeholder="Search city, region, or country..."
                       value={destination}
-                      onChange={(e) => setDestination(e.target.value)}
+                      onChange={(value) => {
+                        setDestination(value);
+                        setSelectedPlace(null);
+                      }}
+                      onSelect={(place) => {
+                        setDestination(place.placeName || place.name || "");
+                        setSelectedPlace(place);
+                      }}
                     />
                   ) : (
-                    <label className="block">
-                      <textarea
-                        value={multiCities}
-                        onChange={(e) => setMultiCities(e.target.value)}
-                        placeholder={`Paris, France\nRome, Italy\nBarcelona, Spain`}
-                        className="min-h-36 w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100"
-                      />
-                      <div className="mt-2 text-xs text-slate-500">
-                        The itinerary will include all listed cities in order.
+                    <div className="space-y-4">
+                      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                        <CityAutoComplete
+                          label="Add city"
+                          placeholder="Search and choose a city..."
+                          value={multiCityInput}
+                          onChange={(value) => {
+                            setMultiCityInput(value);
+                            setMultiCitySelectedPlace(null);
+                          }}
+                          onSelect={(place) => {
+                            setMultiCityInput(place.placeName || place.name || "");
+                            setMultiCitySelectedPlace(place);
+                          }}
+                          onEnter={() => {
+                            addMultiCity();
+                          }}
+                        />
+
+                        <Button
+                          type="button"
+                          className="w-full sm:w-auto"
+                          onClick={addMultiCity}
+                        >
+                          Add city
+                        </Button>
                       </div>
-                    </label>
+
+                      {multiCityPlaces.length ? (
+                        <div className="space-y-3">
+                          {multiCityPlaces.map((city, index) => (
+                            <div
+                              key={city.id}
+                              className="flex flex-col gap-3 rounded-[1.25rem] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">{city.flag || "🌍"}</span>
+                                  <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-sky-700">
+                                    Stop {index + 1}
+                                  </span>
+                                </div>
+
+                                <div className="mt-2 text-sm font-bold text-slate-900">
+                                  {city.placeName}
+                                </div>
+
+                                {(city.region || city.country) && (
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {[city.region, city.country]
+                                      .filter(Boolean)
+                                      .join(", ")}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => moveMultiCityUp(index)}
+                                  disabled={index === 0}
+                                  className={cx(
+                                    "rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                                    index === 0
+                                      ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+                                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                  )}
+                                >
+                                  ↑ Up
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => moveMultiCityDown(index)}
+                                  disabled={index === multiCityPlaces.length - 1}
+                                  className={cx(
+                                    "rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                                    index === multiCityPlaces.length - 1
+                                      ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+                                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                  )}
+                                >
+                                  ↓ Down
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => removeMultiCity(index)}
+                                  className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+                          No cities added yet. Search for a city and click
+                          <b> Add city</b>.
+                        </div>
+                      )}
+                    </div>
                   )}
                 </SectionBlock>
 
@@ -859,8 +1059,8 @@ export default function CreateTrip() {
                     <GlassPill>
                       {daysCount ? `${daysCount} days` : "Invalid dates"}
                     </GlassPill>
-                    {tripMode === "multi" && parsedCities.length ? (
-                      <GlassPill>{parsedCities.length} cities</GlassPill>
+                    {tripMode === "multi" && multiCityPlaces.length ? (
+                      <GlassPill>{multiCityPlaces.length} cities</GlassPill>
                     ) : null}
                     {travelerCount ? (
                       <GlassPill>{travelerSummary}</GlassPill>
@@ -926,24 +1126,24 @@ export default function CreateTrip() {
                 <MiniInfo label="Trip energy" value={tripEnergy} />
               </div>
 
-              {tripMode === "multi" && parsedCities.length ? (
+              {tripMode === "multi" && multiCityPlaces.length ? (
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="text-sm font-bold text-slate-900">
                       Cities in this trip
                     </div>
                     <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {parsedCities.length} cities
+                      {multiCityPlaces.length} cities
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {parsedCities.map((city) => (
+                    {multiCityPlaces.map((city, index) => (
                       <span
-                        key={city}
+                        key={city.id}
                         className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
                       >
-                        {city}
+                        {index + 1}. {city.placeName}
                       </span>
                     ))}
                   </div>

@@ -860,6 +860,7 @@ function DayNavigator({ days, openAll, collapseAll }) {
           </div>
         }
       />
+
     </Card>
   );
 }
