@@ -379,8 +379,15 @@ export default function ViewTrip() {
     setOpenDays(next);
   };
 
-  const downloadPDF = async () => {
+const downloadPDF = async () => {
+  try {
     const res = await api.get(`/trips/${id}/pdf`, { responseType: "blob" });
+
+    const contentType = res?.headers?.["content-type"] || "";
+    if (!contentType.includes("pdf")) {
+      throw new Error("Invalid PDF response");
+    }
+
     const blob = new Blob([res.data], { type: "application/pdf" });
     const url = window.URL.createObjectURL(blob);
 
@@ -392,12 +399,16 @@ export default function ViewTrip() {
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = `trip-${safeName}.pdf`;
+    a.download = `trip-${safeName || "planner"}.pdf`;
     document.body.appendChild(a);
     a.click();
     a.remove();
+
     window.URL.revokeObjectURL(url);
-  };
+  } catch (err) {
+    console.error("Download PDF error:", err);
+  }
+};
 
   const locations = useMemo(() => extractUniqueLocations(trip?.itinerary), [trip]);
   const recommendedPlaces = useMemo(
