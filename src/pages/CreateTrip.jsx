@@ -68,11 +68,6 @@ function parseCities(text) {
     .filter(Boolean);
 }
 
-function formatTravelersLabel(value) {
-  if (!value) return "Not specified";
-  return `${value} traveler${value === "1" ? "" : "s"}`;
-}
-
 function normalizeSourceTab(tab) {
   if (!tab) return "";
   if (["Flights", "Hotels", "Stays", "Activities"].includes(tab)) return tab;
@@ -89,6 +84,64 @@ function getTripEnergy(pace, budget) {
   }
   if (pace === "relaxed") return "Easy rhythm, less rush, more breathing room";
   return "Balanced flow with smart daily pacing";
+}
+
+function cx(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function getTravelerSummary(travelers) {
+  const adults = Number(travelers.adults || 0);
+  const children = Number(travelers.children || 0);
+  const infants = Number(travelers.infants || 0);
+  const total = adults + children + infants;
+
+  if (!total) return "Not specified";
+
+  const parts = [];
+  if (adults) parts.push(`${adults} adult${adults > 1 ? "s" : ""}`);
+  if (children) parts.push(`${children} child${children > 1 ? "ren" : ""}`);
+  if (infants) parts.push(`${infants} infant${infants > 1 ? "s" : ""}`);
+
+  return parts.join(", ");
+}
+
+function getTravelerCount(travelers) {
+  return (
+    Number(travelers?.adults || 0) +
+    Number(travelers?.children || 0) +
+    Number(travelers?.infants || 0)
+  );
+}
+
+function clampTravelerValue(value, min, max) {
+  const n = Number(value || 0);
+  if (Number.isNaN(n)) return min;
+  return Math.max(min, Math.min(max, n));
+}
+
+function parseTravelersParam(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return { adults: 2, children: 0, infants: 0 };
+  }
+
+  if (/^\d+$/.test(raw)) {
+    const total = clampTravelerValue(Number(raw), 1, 12);
+    return { adults: total, children: 0, infants: 0 };
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      adults: clampTravelerValue(parsed?.adults, 1, 12),
+      children: clampTravelerValue(parsed?.children, 0, 8),
+      infants: clampTravelerValue(parsed?.infants, 0, 6),
+    };
+  } catch {
+    return { adults: 2, children: 0, infants: 0 };
+  }
 }
 
 export default function CreateTrip() {
@@ -120,10 +173,10 @@ export default function CreateTrip() {
   const [notes, setNotes] = useState("");
   const [includeEvents, setIncludeEvents] = useState(true);
   const [eventTypes, setEventTypes] = useState([]);
+  const [travelers, setTravelers] = useState(parseTravelersParam(travelersParam));
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  const travelers = travelersParam;
   const sourceTab = sourceTabParam;
   const tripType = tripTypeParam;
   const from = fromParam;
@@ -138,6 +191,7 @@ export default function CreateTrip() {
     setDestination(destinationParam || "");
     setStartDate(nextStart);
     setEndDate(nextEnd);
+    setTravelers(parseTravelersParam(travelersParam));
 
     if (sourceTab === "Activities") {
       setInterests((prev) => {
@@ -169,12 +223,18 @@ export default function CreateTrip() {
         setPace("moderate");
       }
     }
-  }, [destinationParam, startDateParam, endDateParam, sourceTab, tripType]);
+  }, [destinationParam, startDateParam, endDateParam, travelersParam, sourceTab, tripType]);
 
   const minStartDate = todayISOPlus(0);
-  const minEndDate = useMemo(() => addDays(startDate || minStartDate, 1), [startDate]);
+  const minEndDate = useMemo(
+    () => addDays(startDate || minStartDate, 1),
+    [startDate, minStartDate]
+  );
 
   const parsedCities = useMemo(() => parseCities(multiCities), [multiCities]);
+
+  const travelerCount = useMemo(() => getTravelerCount(travelers), [travelers]);
+  const travelerSummary = useMemo(() => getTravelerSummary(travelers), [travelers]);
 
   const daysCount = useMemo(() => {
     const s = new Date(`${startDate}T12:00:00`);
@@ -211,16 +271,24 @@ export default function CreateTrip() {
     }
 
     const target =
-      tripMode === "multi"
-        ? parsedCities.join(" → ")
-        : destination.trim();
+      tripMode === "multi" ? parsedCities.join(" → ") : destination.trim();
 
     let summary = `A ${pace} ${daysCount || ""}-day trip to ${target}`;
     if (budget) summary += ` with a ${budget} budget`;
-    if (travelers) summary += ` for ${formatTravelersLabel(travelers).toLowerCase()}`;
+    if (travelerCount) summary += ` for ${travelerSummary.toLowerCase()}`;
     if (includeEvents) summary += " including local events";
     return summary;
-  }, [tripMode, destination, parsedCities, pace, daysCount, budget, travelers, includeEvents]);
+  }, [
+    tripMode,
+    destination,
+    parsedCities,
+    pace,
+    daysCount,
+    budget,
+    travelerCount,
+    travelerSummary,
+    includeEvents,
+  ]);
 
   function toggleInterest(x) {
     setInterests((prev) =>
@@ -254,6 +322,25 @@ export default function CreateTrip() {
     setEndDate(value);
   }
 
+  function updateTraveler(type, delta) {
+    setTravelers((prev) => {
+      const limits = {
+        adults: { min: 1, max: 12 },
+        children: { min: 0, max: 8 },
+        infants: { min: 0, max: 6 },
+      };
+
+      const current = Number(prev[type] || 0);
+      const nextValue = clampTravelerValue(
+        current + delta,
+        limits[type].min,
+        limits[type].max
+      );
+
+      return { ...prev, [type]: nextValue };
+    });
+  }
+
   function resetForm() {
     const nextStart = clampToToday(startDateParam || todayISOPlus(0));
     setTripMode("single");
@@ -267,6 +354,7 @@ export default function CreateTrip() {
     setNotes("");
     setIncludeEvents(true);
     setEventTypes([]);
+    setTravelers(parseTravelersParam(travelersParam));
     setErr("");
   }
 
@@ -298,6 +386,11 @@ export default function CreateTrip() {
       return;
     }
 
+    if (travelerCount < 1) {
+      setErr("Please choose at least 1 traveler.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -312,7 +405,13 @@ export default function CreateTrip() {
           budget,
           interests,
           notes: cleanNotes,
-          travelers,
+          travelers: {
+            adults: Number(travelers.adults || 0),
+            children: Number(travelers.children || 0),
+            infants: Number(travelers.infants || 0),
+            total: travelerCount,
+            summary: travelerSummary,
+          },
           sourceTab,
           tripType,
           from,
@@ -335,153 +434,156 @@ export default function CreateTrip() {
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden border-slate-200 shadow-[0_24px_80px_-30px_rgba(15,23,42,0.25)]">
-        <div className="relative overflow-hidden bg-linear-to-br from-sky-600 via-blue-600 to-indigo-700 p-6 text-white sm:p-8">
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute -right-10 top-0 h-40 w-40 rounded-full bg-white/20 blur-3xl" />
-            <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl" />
-          </div>
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+        <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
+        <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
 
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <Badge className="border-white/20 bg-white/10 text-white">
-                AI Trip Builder
-              </Badge>
+        <div className="relative grid gap-6 p-6 lg:grid-cols-12 lg:p-8">
+          <div className="lg:col-span-8">
+            <Badge className="border-sky-200 bg-sky-50 text-sky-700">
+              AI Trip Builder
+            </Badge>
 
-              <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
-                Create your next trip in minutes
-              </h1>
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              Create your next trip
+            </h1>
 
-              <p className="mt-3 text-sm leading-6 text-white/90 sm:text-base">
-                Choose your destination, dates, pace, budget, and interests — then let AI
-                generate a polished itinerary you can save and explore.
-              </p>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
+              Build your itinerary with destination, dates, travel style,
+              travelers, interests, notes, and local events — then generate and
+              save it directly to your account.
+            </p>
 
-              <div className="mt-4 text-sm text-white/85">{formSummary}</div>
+            <div className="mt-6 grid gap-4 sm:grid-cols-4">
+              <TopHeroStat
+                label="Trip mode"
+                value={tripMode === "multi" ? "Multi-city" : "One city"}
+              />
+              <TopHeroStat
+                label="Duration"
+                value={daysCount ? `${daysCount} days` : "Check dates"}
+              />
+              <TopHeroStat
+                label="Travelers"
+                value={travelerCount ? `${travelerCount} total` : "Not set"}
+              />
+              <TopHeroStat
+                label="Events"
+                value={includeEvents ? "Enabled" : "Disabled"}
+              />
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Badge className="border-white/20 bg-white/10 text-white">
-                {tripMode === "multi" ? "Multi city" : "One city"}
-              </Badge>
+            <div className="mt-6 rounded-[1.5rem] border border-sky-100 bg-white/80 p-4 shadow-sm">
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
+                Trip summary
+              </div>
+              <div className="mt-2 text-sm leading-6 text-slate-700">
+                {formSummary}
+              </div>
+            </div>
+          </div>
 
-              {daysCount ? (
-                <Badge className="border-white/20 bg-white/10 text-white">
-                  {daysCount} days
-                </Badge>
-              ) : (
-                <Badge className="border-white/20 bg-white/10 text-white">
-                  Invalid dates
-                </Badge>
-              )}
-
-              {tripMode === "multi" && parsedCities.length ? (
-                <Badge className="border-white/20 bg-white/10 text-white">
-                  {parsedCities.length} cities
-                </Badge>
-              ) : null}
-
-              {travelers ? (
-                <Badge className="border-white/20 bg-white/10 text-white">
-                  {formatTravelersLabel(travelers)}
-                </Badge>
-              ) : null}
-
-              {sourceTab ? (
-                <Badge className="border-white/20 bg-white/10 text-white">
-                  From {sourceTab}
-                </Badge>
-              ) : null}
-
-              {tripType ? (
-                <Badge className="border-white/20 bg-white/10 text-white">
-                  {tripType}
-                </Badge>
-              ) : null}
-
-              {includeEvents ? (
-                <Badge className="border-white/20 bg-white/10 text-white">
-                  Events on
-                </Badge>
-              ) : null}
+          <div className="lg:col-span-4">
+            <div className="rounded-[1.75rem] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur">
+              <div className="text-sm font-bold text-slate-900">
+                Live planning insights
+              </div>
+              <div className="mt-4 grid gap-3">
+                <MiniInsight
+                  title="Smart pacing"
+                  text="Your itinerary adapts to relaxed, moderate, or packed travel styles."
+                />
+                <MiniInsight
+                  title="Traveler aware"
+                  text="Solo, couple, family, and group plans can feel more realistic."
+                />
+                <MiniInsight
+                  title="Events ready"
+                  text="Optionally include concerts, food, culture, nightlife, and more."
+                />
+              </div>
             </div>
           </div>
         </div>
-      </Card>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="space-y-6 lg:col-span-5">
-          <Card>
+      <div className="grid gap-6 xl:grid-cols-12">
+        <div className="space-y-6 xl:col-span-5">
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
             <CardHeader
               title="Trip details"
-              subtitle="Fill in the essentials for your itinerary"
-              right={daysCount ? <Badge>{daysCount} days</Badge> : <Badge>Check dates</Badge>}
+              subtitle="Customize the essentials before generating your itinerary"
+              right={
+                <Badge className="border-sky-200 bg-sky-50 text-sky-700">
+                  {daysCount ? `${daysCount} days` : "Check dates"}
+                </Badge>
+              }
             />
 
-            <CardBody>
-              <form onSubmit={generate} className="space-y-5">
-                <div>
-                  <div className="mb-2 text-sm font-semibold text-slate-700">Trip mode</div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
+            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+              <form onSubmit={generate} className="space-y-6">
+                <SectionBlock
+                  title="Trip mode"
+                  subtitle="Choose whether you want one destination or multiple cities"
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <ModeCard
+                      active={tripMode === "single"}
+                      tone="sky"
+                      title="One city"
+                      text="Best for focused trips with one destination"
                       onClick={() => setTripMode("single")}
-                      className={[
-                        "rounded-full border px-4 py-2 text-sm font-semibold transition",
-                        tripMode === "single"
-                          ? "border-sky-600 bg-sky-600 text-white"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                      ].join(" ")}
-                    >
-                      One city
-                    </button>
-
-                    <button
-                      type="button"
+                    />
+                    <ModeCard
+                      active={tripMode === "multi"}
+                      tone="indigo"
+                      title="Multi city"
+                      text="Best for route-based travel across cities"
                       onClick={() => setTripMode("multi")}
-                      className={[
-                        "rounded-full border px-4 py-2 text-sm font-semibold transition",
-                        tripMode === "multi"
-                          ? "border-sky-600 bg-sky-600 text-white"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                      ].join(" ")}
-                    >
-                      Multi city
-                    </button>
+                    />
                   </div>
-                </div>
+                </SectionBlock>
 
-                {tripMode === "single" ? (
-                  <Input
-                    label="Destination"
-                    placeholder="e.g., Paris, France"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                  />
-                ) : (
-                  <label className="block">
-                    <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
-                      <span>Cities</span>
-                      <span className="text-xs font-medium text-slate-400">
+                <SectionBlock
+                  title={tripMode === "single" ? "Destination" : "Cities"}
+                  subtitle={
+                    tripMode === "single"
+                      ? "Choose the main place you want to visit"
+                      : "Enter one city per line in the order you want to visit them"
+                  }
+                  right={
+                    tripMode === "multi" ? (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                         {parsedCities.length} selected
                       </span>
-                    </div>
-
-                    <textarea
-                      value={multiCities}
-                      onChange={(e) => setMultiCities(e.target.value)}
-                      placeholder={`Paris, France\nRome, Italy\nBarcelona, Spain`}
-                      className="min-h-30 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                    ) : null
+                  }
+                >
+                  {tripMode === "single" ? (
+                    <Input
+                      label="Destination"
+                      placeholder="e.g., Paris, France"
+                      value={destination}
+                      onChange={(e) => setDestination(e.target.value)}
                     />
+                  ) : (
+                    <label className="block">
+                      <textarea
+                        value={multiCities}
+                        onChange={(e) => setMultiCities(e.target.value)}
+                        placeholder={`Paris, France\nRome, Italy\nBarcelona, Spain`}
+                        className="min-h-36 w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                      />
+                      <div className="mt-2 text-xs text-slate-500">
+                        The itinerary will include all listed cities in order.
+                      </div>
+                    </label>
+                  )}
+                </SectionBlock>
 
-                    <div className="mt-2 text-xs text-slate-500">
-                      Enter one city per line. The itinerary will include all listed cities.
-                    </div>
-                  </label>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
+                <SectionBlock title="Trip dates" subtitle="Choose your travel period">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Input
                       label="Start date"
                       type="date"
@@ -489,9 +591,6 @@ export default function CreateTrip() {
                       min={minStartDate}
                       onChange={(e) => handleStartDateChange(e.target.value)}
                     />
-                  </div>
-
-                  <div>
                     <Input
                       label="End date"
                       type="date"
@@ -500,28 +599,104 @@ export default function CreateTrip() {
                       onChange={(e) => handleEndDateChange(e.target.value)}
                     />
                   </div>
-                </div>
+                </SectionBlock>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Select label="Pace" value={pace} onChange={(e) => setPace(e.target.value)}>
-                    <option value="relaxed">relaxed</option>
-                    <option value="moderate">moderate</option>
-                    <option value="packed">packed</option>
-                  </Select>
+                <SectionBlock
+                  title="Travel style"
+                  subtitle="Set the rhythm and budget for the trip"
+                >
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Select
+                      label="Pace"
+                      value={pace}
+                      onChange={(e) => setPace(e.target.value)}
+                    >
+                      <option value="relaxed">relaxed</option>
+                      <option value="moderate">moderate</option>
+                      <option value="packed">packed</option>
+                    </Select>
 
-                  <Select label="Budget" value={budget} onChange={(e) => setBudget(e.target.value)}>
-                    <option value="low">low</option>
-                    <option value="mid">mid</option>
-                    <option value="high">high</option>
-                  </Select>
-                </div>
-
-                <div>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-slate-700">Interests</div>
-                    <div className="text-xs text-slate-500">{interests.length} selected</div>
+                    <Select
+                      label="Budget"
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                    >
+                      <option value="low">low</option>
+                      <option value="mid">mid</option>
+                      <option value="high">high</option>
+                    </Select>
                   </div>
 
+                  <div className="mt-4 rounded-[1.25rem] border border-sky-100 bg-sky-50/70 px-4 py-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                      Trip energy
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800">
+                      {tripEnergy}
+                    </div>
+                  </div>
+                </SectionBlock>
+
+                <SectionBlock
+                  title="Travelers"
+                  subtitle="Choose who is going so the AI can shape better suggestions"
+                  right={
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {travelerCount} total
+                    </span>
+                  }
+                >
+                  <div className="space-y-3">
+                    <TravelerRow
+                      title="Adults"
+                      subtitle="Age 13+"
+                      value={travelers.adults}
+                      onDecrease={() => updateTraveler("adults", -1)}
+                      onIncrease={() => updateTraveler("adults", 1)}
+                      disableDecrease={Number(travelers.adults) <= 1}
+                      disableIncrease={Number(travelers.adults) >= 12}
+                    />
+
+                    <TravelerRow
+                      title="Children"
+                      subtitle="Age 2–12"
+                      value={travelers.children}
+                      onDecrease={() => updateTraveler("children", -1)}
+                      onIncrease={() => updateTraveler("children", 1)}
+                      disableDecrease={Number(travelers.children) <= 0}
+                      disableIncrease={Number(travelers.children) >= 8}
+                    />
+
+                    <TravelerRow
+                      title="Infants"
+                      subtitle="Under 2"
+                      value={travelers.infants}
+                      onDecrease={() => updateTraveler("infants", -1)}
+                      onIncrease={() => updateTraveler("infants", 1)}
+                      disableDecrease={Number(travelers.infants) <= 0}
+                      disableIncrease={Number(travelers.infants) >= 6}
+                    />
+                  </div>
+
+                  <div className="mt-4 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Traveler summary
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800">
+                      {travelerSummary}
+                    </div>
+                  </div>
+                </SectionBlock>
+
+                <SectionBlock
+                  title="Interests"
+                  subtitle="Help the AI shape your itinerary around what matters most"
+                  right={
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {interests.length} selected
+                    </span>
+                  }
+                >
                   <div className="flex flex-wrap gap-2">
                     {interestOptions.map((x) => {
                       const active = interests.includes(x);
@@ -531,48 +706,42 @@ export default function CreateTrip() {
                           type="button"
                           key={x}
                           onClick={() => toggleInterest(x)}
-                          className={[
-                            "rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition",
+                          className={cx(
+                            "rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition-all duration-200",
                             active
-                              ? "border-sky-600 bg-sky-600 text-white"
-                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                          ].join(" ")}
+                              ? "border-sky-600 bg-sky-600 text-white shadow-sm"
+                              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
+                          )}
                         >
                           {x}
                         </button>
                       );
                     })}
                   </div>
-                </div>
+                </SectionBlock>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800">
-                        Events during your trip
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        Discover local festivals, parties, concerts, and more on your selected dates.
-                      </div>
-                    </div>
-
+                <SectionBlock
+                  title="Events during your trip"
+                  subtitle="Add local concerts, nightlife, festivals, food events, and more"
+                  tone="indigo"
+                  right={
                     <button
                       type="button"
                       onClick={() => setIncludeEvents((prev) => !prev)}
-                      className={[
-                        "rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                      className={cx(
+                        "rounded-full px-4 py-2 text-xs font-bold transition-all duration-200",
                         includeEvents
-                          ? "bg-sky-600 text-white"
-                          : "bg-slate-200 text-slate-700",
-                      ].join(" ")}
+                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                          : "bg-slate-200 text-slate-700"
+                      )}
                     >
                       {includeEvents ? "Enabled" : "Disabled"}
                     </button>
-                  </div>
-
+                  }
+                >
                   {includeEvents ? (
                     <div>
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                         Event types
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -584,12 +753,12 @@ export default function CreateTrip() {
                               type="button"
                               key={x}
                               onClick={() => toggleEventType(x)}
-                              className={[
-                                "rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition",
+                              className={cx(
+                                "rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition-all duration-200",
                                 active
                                   ? "border-indigo-600 bg-indigo-600 text-white"
-                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                              ].join(" ")}
+                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                              )}
                             >
                               {x}
                             </button>
@@ -597,30 +766,46 @@ export default function CreateTrip() {
                         })}
                       </div>
                     </div>
-                  ) : null}
-                </div>
+                  ) : (
+                    <div className="rounded-[1.25rem] border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-500">
+                      Events are currently turned off for this trip.
+                    </div>
+                  )}
+                </SectionBlock>
 
-                <label className="block">
-                  <div className="mb-1.5 flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
-                    <span>Notes (optional)</span>
-                    <span className="text-xs font-medium text-slate-400">
+                <SectionBlock
+                  title="Notes"
+                  subtitle="Optional preferences for food, walking, family style, timing, and more"
+                  right={
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                       {notes.length}/300
                     </span>
-                  </div>
-
-                  <textarea
-                    value={notes}
-                    maxLength={300}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="e.g., we like walking, cafes, local food, not too early, family-friendly..."
-                    className="min-h-30 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                  />
-                </label>
+                  }
+                >
+                  <label className="block">
+                    <textarea
+                      value={notes}
+                      maxLength={300}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="e.g., we like walking, cafes, local food, not too early, family-friendly..."
+                      className="min-h-36 w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    />
+                  </label>
+                </SectionBlock>
 
                 {err ? <Alert type="error">{err}</Alert> : null}
 
+                <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  When you click <b>Generate &amp; Save</b>, your AI itinerary is
+                  created and saved directly to your account.
+                </div>
+
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full sm:w-auto"
+                  >
                     {loading ? "Generating..." : "Generate & Save"}
                   </Button>
 
@@ -642,109 +827,121 @@ export default function CreateTrip() {
                     Reset Form
                   </Button>
                 </div>
-
-                <div className="text-xs text-slate-500">
-                  Generates an AI itinerary and saves it directly to your account.
-                </div>
               </form>
             </CardBody>
           </Card>
         </div>
 
-        <div className="space-y-6 lg:col-span-7">
-          <Card className="overflow-hidden">
-            <div className="bg-linear-to-br from-slate-900 via-slate-800 to-slate-700 p-6 text-white">
-              <div className="text-sm font-semibold uppercase tracking-wide text-white/75">
-                Live Preview
+        <div className="space-y-6 xl:col-span-7">
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
+            <div className="relative overflow-hidden bg-linear-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white">
+              <div className="absolute inset-0">
+                <div className="absolute -right-10 top-0 h-40 w-40 rounded-full bg-sky-500/20 blur-3xl" />
+                <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl" />
               </div>
 
-              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <div className="text-2xl font-black">{previewTitle}</div>
-                  <div className="mt-2 text-sm text-white/85">
-                    {startDate} → {endDate} • pace: {pace} • budget: {budget}
+              <div className="relative">
+                <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">
+                  Live Preview
+                </div>
+
+                <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <div className="text-2xl font-black tracking-tight sm:text-3xl">
+                      {previewTitle}
+                    </div>
+                    <div className="mt-2 text-sm text-white/75">
+                      {startDate} → {endDate} • pace: {pace} • budget: {budget}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <GlassPill>
+                      {daysCount ? `${daysCount} days` : "Invalid dates"}
+                    </GlassPill>
+                    {tripMode === "multi" && parsedCities.length ? (
+                      <GlassPill>{parsedCities.length} cities</GlassPill>
+                    ) : null}
+                    {travelerCount ? (
+                      <GlassPill>{travelerSummary}</GlassPill>
+                    ) : null}
+                    {includeEvents ? <GlassPill>local events</GlassPill> : null}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
-                    {daysCount ? `${daysCount} days` : "Invalid dates"}
-                  </span>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {(interests.length ? interests : ["custom trip"])
+                    .slice(0, 6)
+                    .map((x) => (
+                      <GlassPill key={x} className="capitalize">
+                        {x}
+                      </GlassPill>
+                    ))}
 
-                  {tripMode === "multi" && parsedCities.length ? (
-                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
-                      {parsedCities.length} cities
-                    </span>
-                  ) : null}
-
-                  {travelers ? (
-                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
-                      {formatTravelersLabel(travelers)}
-                    </span>
-                  ) : null}
-
-                  {includeEvents ? (
-                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
-                      local events
-                    </span>
-                  ) : null}
+                  {includeEvents &&
+                    eventTypes.slice(0, 4).map((x) => (
+                      <GlassPill key={`event-${x}`} className="capitalize">
+                        {x}
+                      </GlassPill>
+                    ))}
                 </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(interests.length ? interests : ["custom trip"]).slice(0, 6).map((x) => (
-                  <span
-                    key={x}
-                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold capitalize"
-                  >
-                    {x}
-                  </span>
-                ))}
-
-                {includeEvents &&
-                  eventTypes.slice(0, 4).map((x) => (
-                    <span
-                      key={`event-${x}`}
-                      className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold capitalize"
-                    >
-                      {x}
-                    </span>
-                  ))}
               </div>
             </div>
 
-            <CardBody>
+            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
               <div className="grid gap-4 sm:grid-cols-2">
-                <PreviewCard title="Day structure" text="Morning / Afternoon / Evening" />
-                <PreviewCard title="Smart pacing" text="Balanced flow based on your trip style" />
-                <PreviewCard title="Preferences-aware" text="Interests, notes, and source context included" />
-                <PreviewCard title="Saved securely" text="Stored in your account for later access" />
+                <PreviewCard
+                  title="Day structure"
+                  text="Morning / Afternoon / Evening planning blocks"
+                />
+                <PreviewCard
+                  title="Smart pacing"
+                  text="Trip flow adjusts to your selected pace and budget"
+                />
+                <PreviewCard
+                  title="Traveler-aware"
+                  text="Suggestions can better fit solo travel, couples, families, and groups"
+                />
+                <PreviewCard
+                  title="Saved securely"
+                  text="Your itinerary is stored in your account for later use"
+                />
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-3">
                 <MiniInfo
                   label={tripMode === "multi" ? "Trip mode" : "Destination"}
-                  value={tripMode === "multi" ? "Multi-city" : (destination || "Not selected yet")}
+                  value={
+                    tripMode === "multi"
+                      ? "Multi-city"
+                      : destination || "Not selected yet"
+                  }
                 />
                 <MiniInfo label="Pace" value={pace} />
                 <MiniInfo label="Budget" value={budget} />
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2">
+                <MiniInfo label="Travelers" value={travelerSummary} />
                 <MiniInfo label="Trip energy" value={tripEnergy} />
-                <MiniInfo label="Date rule" value="End date stays after start date" />
               </div>
 
               {tripMode === "multi" && parsedCities.length ? (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Cities in this trip
+                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-bold text-slate-900">
+                      Cities in this trip
+                    </div>
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {parsedCities.length} cities
+                    </div>
                   </div>
+
                   <div className="flex flex-wrap gap-2">
                     {parsedCities.map((city) => (
                       <span
                         key={city}
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
                       >
                         {city}
                       </span>
@@ -753,35 +950,41 @@ export default function CreateTrip() {
                 </div>
               ) : null}
 
-              {(sourceTab || travelers || tripType) && (
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {(sourceTab || travelerCount || tripType) && (
+                <div className="grid gap-3 md:grid-cols-3">
                   {sourceTab ? <MiniInfo label="Source" value={sourceTab} /> : null}
-                  {travelers ? <MiniInfo label="Travelers" value={formatTravelersLabel(travelers)} /> : null}
+                  {travelerCount ? (
+                    <MiniInfo label="Total people" value={`${travelerCount}`} />
+                  ) : null}
                   {tripType ? <MiniInfo label="Trip type" value={tripType} /> : null}
                 </div>
               )}
 
               {includeEvents ? (
-                <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm text-slate-600">
-                  <div className="mb-1 font-semibold text-slate-800">Events enabled</div>
-                  Your trip will also try to include local happenings for the selected date range.
+                <div className="rounded-[1.5rem] border border-indigo-100 bg-linear-to-r from-indigo-50 to-sky-50 p-4 text-sm text-slate-600">
+                  <div className="mb-1 font-bold text-slate-900">
+                    Events enabled
+                  </div>
+                  Your trip will also try to include local happenings within your
+                  selected date range.
                 </div>
               ) : null}
 
-              {notes.trim() && (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  <div className="mb-1 font-semibold text-slate-800">Trip notes</div>
+              {notes.trim() ? (
+                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+                  <div className="mb-2 font-bold text-slate-900">Trip notes</div>
                   {notes.trim()}
                 </div>
-              )}
+              ) : null}
 
-              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                When you click <b>Generate & Save</b>, your itinerary is created and saved immediately.
+              <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                Preview your trip settings here before generating the final
+                itinerary.
               </div>
             </CardBody>
           </Card>
 
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
             <CardHeader
               title="Destination map"
               subtitle={
@@ -789,16 +992,28 @@ export default function CreateTrip() {
                   ? `Live location preview for ${mapQuery}`
                   : "Enter a destination to preview it on the map"
               }
+              right={
+                mapQuery ? (
+                  <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                    Preview ready
+                  </Badge>
+                ) : (
+                  <Badge className="border-slate-200 bg-slate-100 text-slate-600">
+                    Waiting
+                  </Badge>
+                )
+              }
             />
-            <CardBody className="space-y-4">
-              <MapTilerMap query={mapQuery} height={380} />
 
-              <div className="grid gap-3 sm:grid-cols-1">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  {tripMode === "multi"
-                    ? "For multi-city trips, the map previews your first city before generation."
-                    : "Use the live map to confirm your destination before generating the full itinerary."}
-                </div>
+            <CardBody className="space-y-4 bg-linear-to-b from-white to-slate-50/60">
+              <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 shadow-sm">
+                <MapTilerMap query={mapQuery} height={400} />
+              </div>
+
+              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+                {tripMode === "multi"
+                  ? "For multi-city trips, the map previews your first city before generation."
+                  : "Use the live map to confirm your destination before generating the full itinerary."}
               </div>
             </CardBody>
           </Card>
@@ -808,22 +1023,165 @@ export default function CreateTrip() {
   );
 }
 
+function SectionBlock({ title, subtitle, right, children, tone = "default" }) {
+  const toneClass =
+    tone === "indigo"
+      ? "border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50"
+      : "border-slate-200 bg-white";
+
+  return (
+    <section className={`rounded-[1.5rem] border p-4 shadow-sm ${toneClass}`}>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-bold text-slate-900">{title}</div>
+          {subtitle ? (
+            <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
+          ) : null}
+        </div>
+        {right ? <div>{right}</div> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ModeCard({ active, tone, title, text, onClick }) {
+  const activeClasses =
+    tone === "indigo"
+      ? "border-indigo-500 bg-indigo-50 shadow-md shadow-indigo-100"
+      : "border-sky-500 bg-sky-50 shadow-md shadow-sky-100";
+
+  const titleActive = tone === "indigo" ? "text-indigo-700" : "text-sky-700";
+  const dotActive = tone === "indigo" ? "bg-indigo-600" : "bg-sky-600";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        "group rounded-[1.25rem] border px-4 py-4 text-left transition-all duration-200",
+        active
+          ? activeClasses
+          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className={cx("text-sm font-bold", active ? titleActive : "text-slate-900")}>
+            {title}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">{text}</div>
+        </div>
+        <div
+          className={cx("h-3 w-3 rounded-full", active ? dotActive : "bg-slate-300")}
+        />
+      </div>
+    </button>
+  );
+}
+
+function TravelerRow({
+  title,
+  subtitle,
+  value,
+  onDecrease,
+  onIncrease,
+  disableDecrease,
+  disableIncrease,
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-[1.25rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+      <div>
+        <div className="text-sm font-bold text-slate-900">{title}</div>
+        <div className="mt-1 text-xs text-slate-500">{subtitle}</div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onDecrease}
+          disabled={disableDecrease}
+          className={cx(
+            "grid h-10 w-10 place-items-center rounded-2xl border text-lg font-bold transition",
+            disableDecrease
+              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+          )}
+        >
+          −
+        </button>
+
+        <div className="min-w-[2.5rem] text-center text-lg font-black text-slate-900">
+          {value}
+        </div>
+
+        <button
+          type="button"
+          onClick={onIncrease}
+          disabled={disableIncrease}
+          className={cx(
+            "grid h-10 w-10 place-items-center rounded-2xl border text-lg font-bold transition",
+            disableIncrease
+              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300"
+              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+          )}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TopHeroStat({ label, value }) {
+  return (
+    <div className="rounded-[1.25rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-bold text-slate-900">{value}</div>
+    </div>
+  );
+}
+
+function MiniInsight({ title, text }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="text-sm font-bold text-slate-900">{title}</div>
+      <div className="mt-1 text-sm leading-6 text-slate-600">{text}</div>
+    </div>
+  );
+}
+
+function GlassPill({ children, className = "" }) {
+  return (
+    <span
+      className={cx(
+        "rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 function PreviewCard({ title, text }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="font-bold text-slate-900">{title}</div>
-      <div className="mt-1 text-sm text-slate-600">{text}</div>
+    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <div className="text-sm font-bold text-slate-900">{title}</div>
+      <div className="mt-1.5 text-sm leading-6 text-slate-600">{text}</div>
     </div>
   );
 }
 
 function MiniInfo({ label, value }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </div>
-      <div className="text-sm font-semibold text-slate-800">{value}</div>
+      <div className="mt-1 text-sm font-bold text-slate-800">{value}</div>
     </div>
   );
 }

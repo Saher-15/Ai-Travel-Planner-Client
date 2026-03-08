@@ -43,6 +43,8 @@ function extractUniqueLocations(itinerary) {
             title: a?.title || "Place",
             timeBlock: block,
             location: (a?.location || "").trim(),
+            notes: a?.notes || "",
+            durationHours: a?.durationHours ?? null,
           }))
           .filter((x) => x.location)
       )
@@ -75,6 +77,33 @@ function extractRecommendedPlaces(itinerary) {
   return Array.from(
     new Map(rows.map((x) => [x.location.toLowerCase(), x])).values()
   );
+}
+
+function countDayActivities(day) {
+  return (
+    (Array.isArray(day?.morning) ? day.morning.length : 0) +
+    (Array.isArray(day?.afternoon) ? day.afternoon.length : 0) +
+    (Array.isArray(day?.evening) ? day.evening.length : 0)
+  );
+}
+
+function getDayEstimatedHours(day) {
+  const activities = [
+    ...(Array.isArray(day?.morning) ? day.morning : []),
+    ...(Array.isArray(day?.afternoon) ? day.afternoon : []),
+    ...(Array.isArray(day?.evening) ? day.evening : []),
+  ];
+
+  return activities.reduce((sum, activity) => {
+    const n = Number(activity?.durationHours);
+    return Number.isFinite(n) && n > 0 ? sum + n : sum;
+  }, 0);
+}
+
+function formatHours(value) {
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  if (Number.isInteger(value)) return `${value}h`;
+  return `${value.toFixed(1)}h`;
 }
 
 function useAsync(fn, deps) {
@@ -316,6 +345,40 @@ export default function ViewTrip() {
 
   const pdfRef = useRef(null);
 
+  const [openDays, setOpenDays] = useState({});
+
+  useEffect(() => {
+    if (!trip?.itinerary?.days?.length) return;
+    const next = {};
+    trip.itinerary.days.forEach((day, index) => {
+      next[day.day] = index === 0;
+    });
+    setOpenDays(next);
+  }, [trip]);
+
+  const toggleDay = (dayNumber) => {
+    setOpenDays((prev) => ({
+      ...prev,
+      [dayNumber]: !prev[dayNumber],
+    }));
+  };
+
+  const openAllDays = () => {
+    const next = {};
+    (trip?.itinerary?.days || []).forEach((day) => {
+      next[day.day] = true;
+    });
+    setOpenDays(next);
+  };
+
+  const collapseAllDays = () => {
+    const next = {};
+    (trip?.itinerary?.days || []).forEach((day) => {
+      next[day.day] = false;
+    });
+    setOpenDays(next);
+  };
+
   const downloadPDF = async () => {
     const res = await api.get(`/trips/${id}/pdf`, { responseType: "blob" });
     const blob = new Blob([res.data], { type: "application/pdf" });
@@ -352,6 +415,14 @@ export default function ViewTrip() {
   const recommendedPoints = recommendedGeoState.data?.points ?? [];
 
   const weatherState = useDestinationWeather(primaryDestination, mapPoints[0]);
+
+  const totalActivities = useMemo(() => {
+    return (trip?.itinerary?.days || []).reduce((sum, day) => sum + countDayActivities(day), 0);
+  }, [trip]);
+
+  const totalHours = useMemo(() => {
+    return (trip?.itinerary?.days || []).reduce((sum, day) => sum + getDayEstimatedHours(day), 0);
+  }, [trip]);
 
   if (tripState.loading) return <TripSkeleton />;
 
@@ -390,6 +461,8 @@ export default function ViewTrip() {
           summary={summary}
           tripMode={tripMode}
           destinations={destinations}
+          totalActivities={totalActivities}
+          totalHours={totalHours}
         />
 
         <CityPlanSection summary={summary} tripMode={tripMode} destinations={destinations} />
@@ -402,9 +475,22 @@ export default function ViewTrip() {
 
         <EventsSection events={trip?.events || []} />
 
+        {!!trip?.itinerary?.days?.length && (
+          <DayNavigator
+            days={trip.itinerary.days}
+            openAll={openAllDays}
+            collapseAll={collapseAllDays}
+          />
+        )}
+
         <div className="grid gap-6 lg:grid-cols-2">
           {trip?.itinerary?.days?.map((d) => (
-            <DayCard key={d.day} day={d} />
+            <DayCard
+              key={d.day}
+              day={d}
+              isOpen={Boolean(openDays[d.day])}
+              onToggle={() => toggleDay(d.day)}
+            />
           ))}
         </div>
 
@@ -635,7 +721,7 @@ function Header({ trip, summary, tripMode, destinations, onBack, onNew, onEdit, 
   );
 }
 
-function TripOverview({ trip, summary, tripMode, destinations }) {
+function TripOverview({ trip, summary, tripMode, destinations, totalActivities, totalHours }) {
   const preferences = trip?.preferences || {};
   const interests = Array.isArray(preferences?.interests) ? preferences.interests : [];
 
@@ -654,6 +740,13 @@ function TripOverview({ trip, summary, tripMode, destinations }) {
           <InfoTile label="Dates" value={fmtRange(trip?.startDate, trip?.endDate) || "—"} />
           <InfoTile label="Pace" value={summary?.style || preferences?.pace || "—"} />
           <InfoTile label="Budget" value={summary?.budget || preferences?.budget || "—"} />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <InfoTile label="Activities" value={totalActivities || "0"} />
+          <InfoTile label="Estimated Hours" value={formatHours(totalHours)} />
+          <InfoTile label="Events" value={trip?.events?.length || "0"} />
+          <InfoTile label="Map Places" value={extractUniqueLocations(trip?.itinerary).length || "0"} />
         </div>
 
         {tripMode === "multi" && destinations.length > 1 ? (
@@ -746,6 +839,27 @@ function CityPlanSection({ summary, tripMode, destinations }) {
           </div>
         )}
       </CardBody>
+    </Card>
+  );
+}
+
+function DayNavigator({ days, openAll, collapseAll }) {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        title="Jump to a Day"
+        subtitle="Quick navigation for longer itineraries"
+        right={
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" className="px-3 py-2 text-xs" onClick={openAll}>
+              Expand all
+            </Button>
+            <Button type="button" variant="ghost" className="px-3 py-2 text-xs" onClick={collapseAll}>
+              Collapse all
+            </Button>
+          </div>
+        }
+      />
     </Card>
   );
 }
@@ -1125,6 +1239,12 @@ function PlacesGallery({ points }) {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                  {place.durationHours ? (
+                    <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">
+                      {formatHours(Number(place.durationHours))}
+                    </span>
+                  ) : null}
+
                   {place.category ? (
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
                       {place.category}
@@ -1137,6 +1257,12 @@ function PlacesGallery({ points }) {
                     </span>
                   ) : null}
                 </div>
+
+                {place.notes ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                    {place.notes}
+                  </div>
+                ) : null}
 
                 {place.address ? (
                   <div className="text-xs leading-5 text-slate-500">{place.address}</div>
@@ -1161,9 +1287,12 @@ function PlacesGallery({ points }) {
   );
 }
 
-function DayCard({ day }) {
+function DayCard({ day, isOpen, onToggle }) {
+  const activityCount = countDayActivities(day);
+  const totalHours = getDayEstimatedHours(day);
+
   return (
-    <Card className="overflow-hidden">
+    <Card id={`day-${day.day}`} className="overflow-hidden scroll-mt-28">
       <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-5 text-white">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1174,28 +1303,43 @@ function DayCard({ day }) {
             <div className="mt-1 text-sm text-white/80">{day.date}</div>
           </div>
 
-          <Badge className="border-white/20 bg-white/10 text-white">
-            Day Plan
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="border-white/20 bg-white/10 text-white">
+              {activityCount} activities
+            </Badge>
+            <Badge className="border-white/20 bg-white/10 text-white">
+              {formatHours(totalHours)}
+            </Badge>
+            <Button
+              type="button"
+              variant="secondary"
+              className="bg-white/15 text-white hover:bg-white/20"
+              onClick={onToggle}
+            >
+              {isOpen ? "Collapse" : "Expand"}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <CardBody>
-        <MiniSection title="Morning" items={day.morning} icon="☀️" />
-        <MiniSection title="Afternoon" items={day.afternoon} icon="🌤️" />
-        <MiniSection title="Evening" items={day.evening} icon="🌙" />
+      {isOpen ? (
+        <CardBody>
+          <MiniSection title="Morning" items={day.morning} icon="☀️" />
+          <MiniSection title="Afternoon" items={day.afternoon} icon="🌤️" />
+          <MiniSection title="Evening" items={day.evening} icon="🌙" />
 
-        {(day.foodSuggestion || day.backupPlan) && (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {day.foodSuggestion ? (
-              <InfoTile label="Food Suggestion" value={clamp(day.foodSuggestion)} />
-            ) : null}
-            {day.backupPlan ? (
-              <InfoTile label="Backup Plan" value={clamp(day.backupPlan)} />
-            ) : null}
-          </div>
-        )}
-      </CardBody>
+          {(day.foodSuggestion || day.backupPlan) && (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {day.foodSuggestion ? (
+                <InfoTile label="Food Suggestion" value={clamp(day.foodSuggestion)} />
+              ) : null}
+              {day.backupPlan ? (
+                <InfoTile label="Backup Plan" value={clamp(day.backupPlan)} />
+              ) : null}
+            </div>
+          )}
+        </CardBody>
+      ) : null}
     </Card>
   );
 }
@@ -1287,10 +1431,29 @@ function MiniSection({ title, items, icon }) {
             key={x.id ?? `${x.title}-${x.location}-${i}`}
             className="rounded-2xl border border-slate-200 bg-white px-3 py-3 transition hover:border-sky-200 hover:bg-sky-50/30"
           >
-            <div className="font-semibold text-slate-900">{x.title}</div>
-            {x.location ? (
-              <div className="mt-0.5 text-xs text-slate-500">{x.location}</div>
-            ) : null}
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-slate-900">{x.title}</div>
+
+                {x.location ? (
+                  <div className="mt-0.5 text-xs text-slate-500">{x.location}</div>
+                ) : null}
+
+                {x.notes ? (
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                    {x.notes}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {x.durationHours ? (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">
+                    {formatHours(Number(x.durationHours))}
+                  </span>
+                ) : null}
+              </div>
+            </div>
           </li>
         ))}
       </ul>

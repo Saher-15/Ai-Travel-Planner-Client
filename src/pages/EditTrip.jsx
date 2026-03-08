@@ -35,6 +35,8 @@ function makeEmptyActivity() {
   return {
     title: "",
     location: "",
+    notes: "",
+    durationHours: "",
   };
 }
 
@@ -42,9 +44,15 @@ function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function normalizeTripForForm(trip) {
   return {
+    tripMode: trip?.tripMode || "single",
     destination: trip?.destination || "",
+    destinations: safeArray(trip?.destinations),
     startDate: trip?.startDate || "",
     endDate: trip?.endDate || "",
     preferences: {
@@ -56,6 +64,11 @@ function normalizeTripForForm(trip) {
       sourceTab: trip?.preferences?.sourceTab || "",
       tripType: trip?.preferences?.tripType || "",
       from: trip?.preferences?.from || "",
+      includeEvents:
+        trip?.preferences?.includeEvents === undefined
+          ? true
+          : Boolean(trip?.preferences?.includeEvents),
+      eventTypes: safeArray(trip?.preferences?.eventTypes),
     },
     itinerary: {
       tripSummary: trip?.itinerary?.tripSummary || {},
@@ -73,14 +86,29 @@ function normalizeTripForForm(trip) {
         morning: safeArray(day?.morning).map((a) => ({
           title: a?.title || "",
           location: a?.location || "",
+          notes: a?.notes || "",
+          durationHours:
+            a?.durationHours === null || a?.durationHours === undefined
+              ? ""
+              : String(a.durationHours),
         })),
         afternoon: safeArray(day?.afternoon).map((a) => ({
           title: a?.title || "",
           location: a?.location || "",
+          notes: a?.notes || "",
+          durationHours:
+            a?.durationHours === null || a?.durationHours === undefined
+              ? ""
+              : String(a.durationHours),
         })),
         evening: safeArray(day?.evening).map((a) => ({
           title: a?.title || "",
           location: a?.location || "",
+          notes: a?.notes || "",
+          durationHours:
+            a?.durationHours === null || a?.durationHours === undefined
+              ? ""
+              : String(a.durationHours),
         })),
         foodSuggestion: day?.foodSuggestion || "",
         backupPlan: day?.backupPlan || "",
@@ -90,11 +118,48 @@ function normalizeTripForForm(trip) {
   };
 }
 
+function normalizeDayNumbers(days) {
+  return safeArray(days).map((day, index) => ({
+    ...day,
+    day: index + 1,
+  }));
+}
+
+function countDayActivities(day) {
+  return (
+    safeArray(day?.morning).length +
+    safeArray(day?.afternoon).length +
+    safeArray(day?.evening).length
+  );
+}
+
+function getDayEstimatedHours(day) {
+  const activities = [
+    ...safeArray(day?.morning),
+    ...safeArray(day?.afternoon),
+    ...safeArray(day?.evening),
+  ];
+
+  const total = activities.reduce((sum, activity) => {
+    const n = Number(activity?.durationHours);
+    return Number.isFinite(n) && n > 0 ? sum + n : sum;
+  }, 0);
+
+  return total;
+}
+
+function formatHours(value) {
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  if (Number.isInteger(value)) return `${value}h`;
+  return `${value.toFixed(1)}h`;
+}
+
 export default function EditTrip() {
   const nav = useNavigate();
   const { id } = useParams();
 
   const [form, setForm] = useState(null);
+  const [initialSnapshot, setInitialSnapshot] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -110,7 +175,10 @@ export default function EditTrip() {
       try {
         const { data } = await api.get(`/trips/${id}`);
         if (!alive) return;
-        setForm(normalizeTripForForm(data));
+
+        const normalized = normalizeTripForForm(data);
+        setForm(normalized);
+        setInitialSnapshot(JSON.stringify(normalized));
       } catch (e) {
         if (!alive) return;
         setErr(e?.response?.data?.message || "Failed to load trip.");
@@ -124,6 +192,22 @@ export default function EditTrip() {
     };
   }, [id]);
 
+  const hasUnsavedChanges = useMemo(() => {
+    if (!form) return false;
+    return JSON.stringify(form) !== initialSnapshot;
+  }, [form, initialSnapshot]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!hasUnsavedChanges) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedChanges]);
+
   const daysCount = useMemo(() => {
     if (!form?.startDate || !form?.endDate) return null;
 
@@ -136,15 +220,12 @@ export default function EditTrip() {
 
   const totalActivities = useMemo(() => {
     if (!form?.itinerary?.days?.length) return 0;
+    return form.itinerary.days.reduce((sum, day) => sum + countDayActivities(day), 0);
+  }, [form]);
 
-    return form.itinerary.days.reduce((sum, day) => {
-      return (
-        sum +
-        safeArray(day.morning).length +
-        safeArray(day.afternoon).length +
-        safeArray(day.evening).length
-      );
-    }, 0);
+  const totalEstimatedHours = useMemo(() => {
+    if (!form?.itinerary?.days?.length) return 0;
+    return form.itinerary.days.reduce((sum, day) => sum + getDayEstimatedHours(day), 0);
   }, [form]);
 
   function updateDay(dayIndex, field, value) {
@@ -163,10 +244,12 @@ export default function EditTrip() {
       const days = [...prev.itinerary.days];
       const day = { ...days[dayIndex] };
       const activities = [...day[block]];
+
       activities[activityIndex] = {
         ...activities[activityIndex],
         [field]: value,
       };
+
       day[block] = activities;
       days[dayIndex] = day;
 
@@ -205,6 +288,112 @@ export default function EditTrip() {
     });
   }
 
+
+
+  function moveActivityWithinBlock(dayIndex, block, activityIndex, direction) {
+    setForm((prev) => {
+      const days = [...prev.itinerary.days];
+      const day = { ...days[dayIndex] };
+      const activities = [...day[block]];
+      const targetIndex = direction === "up" ? activityIndex - 1 : activityIndex + 1;
+
+      if (targetIndex < 0 || targetIndex >= activities.length) return prev;
+
+      [activities[activityIndex], activities[targetIndex]] = [
+        activities[targetIndex],
+        activities[activityIndex],
+      ];
+
+      day[block] = activities;
+      days[dayIndex] = day;
+
+      return {
+        ...prev,
+        itinerary: { ...prev.itinerary, days },
+      };
+    });
+  }
+
+  function moveActivityToAnotherBlock(dayIndex, block, activityIndex, direction) {
+    const currentBlockIndex = BLOCKS.indexOf(block);
+    const targetBlockIndex =
+      direction === "prev" ? currentBlockIndex - 1 : currentBlockIndex + 1;
+
+    if (targetBlockIndex < 0 || targetBlockIndex >= BLOCKS.length) return;
+
+    const targetBlock = BLOCKS[targetBlockIndex];
+
+    setForm((prev) => {
+      const days = [...prev.itinerary.days];
+      const day = { ...days[dayIndex] };
+
+      const fromActivities = [...day[block]];
+      const toActivities = [...day[targetBlock]];
+      const [movedActivity] = fromActivities.splice(activityIndex, 1);
+
+      if (!movedActivity) return prev;
+
+      toActivities.push(movedActivity);
+
+      day[block] = fromActivities;
+      day[targetBlock] = toActivities;
+      days[dayIndex] = day;
+
+      return {
+        ...prev,
+        itinerary: { ...prev.itinerary, days },
+      };
+    });
+  }
+
+  function moveDay(dayIndex, direction) {
+    setForm((prev) => {
+      const days = [...prev.itinerary.days];
+      const targetIndex = direction === "up" ? dayIndex - 1 : dayIndex + 1;
+
+      if (targetIndex < 0 || targetIndex >= days.length) return prev;
+
+      [days[dayIndex], days[targetIndex]] = [days[targetIndex], days[dayIndex]];
+
+      return {
+        ...prev,
+        itinerary: {
+          ...prev.itinerary,
+          days: normalizeDayNumbers(days),
+        },
+      };
+    });
+  }
+
+
+
+  function removeEmptyActivitiesFromDay(dayIndex) {
+    setForm((prev) => {
+      const days = [...prev.itinerary.days];
+      const day = { ...days[dayIndex] };
+
+      for (const block of BLOCKS) {
+        day[block] = safeArray(day[block]).filter(
+          (a) =>
+            (a?.title || "").trim() ||
+            (a?.location || "").trim() ||
+            (a?.notes || "").trim() ||
+            String(a?.durationHours || "").trim()
+        );
+      }
+
+      days[dayIndex] = day;
+
+      return {
+        ...prev,
+        itinerary: {
+          ...prev.itinerary,
+          days,
+        },
+      };
+    });
+  }
+
   async function saveTrip(e) {
     e.preventDefault();
     setErr("");
@@ -223,8 +412,49 @@ export default function EditTrip() {
     setSaving(true);
 
     try {
-      await api.put(`/trips/${id}`, {
+      const normalizedDays = normalizeDayNumbers(
+        safeArray(form.itinerary.days).map((day) => ({
+          ...day,
+          title: (day.title || "").trim(),
+          date: day.date || "",
+          morning: safeArray(day.morning).map((a) => ({
+            title: (a.title || "").trim(),
+            location: (a.location || "").trim(),
+            notes: (a.notes || "").trim(),
+            durationHours:
+              a.durationHours === "" || a.durationHours === null || a.durationHours === undefined
+                ? null
+                : Number(a.durationHours),
+          })),
+          afternoon: safeArray(day.afternoon).map((a) => ({
+            title: (a.title || "").trim(),
+            location: (a.location || "").trim(),
+            notes: (a.notes || "").trim(),
+            durationHours:
+              a.durationHours === "" || a.durationHours === null || a.durationHours === undefined
+                ? null
+                : Number(a.durationHours),
+          })),
+          evening: safeArray(day.evening).map((a) => ({
+            title: (a.title || "").trim(),
+            location: (a.location || "").trim(),
+            notes: (a.notes || "").trim(),
+            durationHours:
+              a.durationHours === "" || a.durationHours === null || a.durationHours === undefined
+                ? null
+                : Number(a.durationHours),
+          })),
+          foodSuggestion: (day.foodSuggestion || "").trim(),
+          backupPlan: (day.backupPlan || "").trim(),
+        }))
+      );
+
+      const payload = {
+        tripMode: form.tripMode,
         destination: form.destination.trim(),
+        destinations: safeArray(form.destinations).length
+          ? safeArray(form.destinations)
+          : [form.destination.trim()],
         startDate: form.startDate,
         endDate: form.endDate,
         preferences: {
@@ -236,12 +466,15 @@ export default function EditTrip() {
           tripSummary: form.itinerary.tripSummary || {},
           tips: safeArray(form.itinerary.tips),
           recommendedPlaces: safeArray(form.itinerary.recommendedPlaces),
-          days: safeArray(form.itinerary.days),
+          days: normalizedDays,
         },
         events: safeArray(form.events),
-      });
+      };
+
+      await api.put(`/trips/${id}`, payload);
 
       setSuccess("Trip updated successfully.");
+      setInitialSnapshot(JSON.stringify(form));
 
       setTimeout(() => {
         nav(`/trip/${id}`);
@@ -299,8 +532,7 @@ export default function EditTrip() {
               </h1>
 
               <p className="mt-3 text-sm leading-6 text-white/85 sm:text-base">
-                Fine-tune your itinerary, adjust activities, and make the trip feel exactly
-                right before viewing the final plan.
+                Reorder days, move activities between plans, and enrich your itinerary with notes and durations.
               </p>
             </div>
 
@@ -314,7 +546,10 @@ export default function EditTrip() {
                 {totalActivities} activities
               </Badge>
               <Badge className="border-white/20 bg-white/10 text-white">
-                Manual editing
+                {formatHours(totalEstimatedHours)}
+              </Badge>
+              <Badge className="border-white/20 bg-white/10 text-white">
+                {hasUnsavedChanges ? "Unsaved changes" : "Saved state"}
               </Badge>
             </div>
           </div>
@@ -377,168 +612,345 @@ export default function EditTrip() {
                 />
               </CardBody>
             </Card>
+
+            <Card>
+              <CardHeader
+                title="Editor tools"
+                subtitle="Quick summary of your current edit state"
+              />
+              <CardBody className="space-y-3">
+                <MiniInfo label="Days" value={safeArray(form?.itinerary?.days).length} />
+                <MiniInfo label="Total Activities" value={totalActivities} />
+                <MiniInfo label="Estimated Hours" value={formatHours(totalEstimatedHours)} />
+                <MiniInfo
+                  label="Status"
+                  value={hasUnsavedChanges ? "Editing..." : "No pending changes"}
+                />
+              </CardBody>
+            </Card>
           </div>
         </div>
 
         <div className="space-y-6 lg:col-span-8">
-          {form.itinerary.days.map((day, dayIndex) => (
-            <Card
-              key={dayIndex}
-              className="overflow-hidden border border-slate-200 shadow-sm transition duration-300 hover:shadow-md"
-            >
-              <div className="bg-linear-to-r from-slate-900 to-slate-800 p-5 text-white">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-white/75">
-                      Day {day.day}
+          {form.itinerary.days.map((day, dayIndex) => {
+            const dayActivities = countDayActivities(day);
+            const dayHours = getDayEstimatedHours(day);
+
+            return (
+              <Card
+                key={dayIndex}
+                className="overflow-hidden border border-slate-200 shadow-sm transition duration-300 hover:shadow-md"
+              >
+                <div className="bg-linear-to-r from-slate-900 to-slate-800 p-5 text-white">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-white/75">
+                          Day {day.day}
+                        </div>
+                        <div className="mt-1 text-xl font-black">Edit day plan</div>
+                        <div className="mt-1 text-sm text-white/75">
+                          Refine activities, titles, day details, durations, and notes
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className="border-white/20 bg-white/10 text-white">
+                          {dayActivities} activities
+                        </Badge>
+                        <Badge className="border-white/20 bg-white/10 text-white">
+                          {formatHours(dayHours)}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="mt-1 text-xl font-black">Edit day plan</div>
-                    <div className="mt-1 text-sm text-white/75">
-                      Refine activities, titles, and day-specific details
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="px-3 py-2 text-xs"
+                        onClick={() => moveDay(dayIndex, "up")}
+                        disabled={dayIndex === 0}
+                      >
+                        ↑ Move day up
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="px-3 py-2 text-xs"
+                        onClick={() => moveDay(dayIndex, "down")}
+                        disabled={dayIndex === form.itinerary.days.length - 1}
+                      >
+                        ↓ Move day down
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="px-3 py-2 text-xs"
+                        onClick={() => removeEmptyActivitiesFromDay(dayIndex)}
+                      >
+                        Clean empty activities
+                      </Button>
                     </div>
                   </div>
-
-                  <Badge className="border-white/20 bg-white/10 text-white">
-                    Day editor
-                  </Badge>
-                </div>
-              </div>
-
-              <CardBody className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Input
-                    label="Day title"
-                    placeholder="e.g. Historic center and local food"
-                    value={day.title}
-                    onChange={(e) => updateDay(dayIndex, "title", e.target.value)}
-                  />
-                  <Input
-                    label="Day date"
-                    type="date"
-                    value={day.date}
-                    onChange={(e) => updateDay(dayIndex, "date", e.target.value)}
-                  />
                 </div>
 
-                {BLOCKS.map((block) => {
-                  const meta = BLOCK_META[block];
+                <CardBody className="space-y-5">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Input
+                      label="Day title"
+                      placeholder="e.g. Historic center and local food"
+                      value={day.title}
+                      onChange={(e) => updateDay(dayIndex, "title", e.target.value)}
+                    />
+                    <Input
+                      label="Day date"
+                      type="date"
+                      value={day.date}
+                      onChange={(e) => updateDay(dayIndex, "date", e.target.value)}
+                    />
+                  </div>
 
-                  return (
-                    <div
-                      key={block}
-                      className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4"
-                    >
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                            <span>{meta.icon}</span>
-                            {meta.title}
+                  {BLOCKS.map((block) => {
+                    const meta = BLOCK_META[block];
+
+                    return (
+                      <div
+                        key={block}
+                        className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4"
+                      >
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                              <span>{meta.icon}</span>
+                              {meta.title}
+                              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                                {safeArray(day[block]).length}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">{meta.desc}</div>
                           </div>
-                          <div className="mt-1 text-xs text-slate-500">{meta.desc}</div>
+
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="px-3 py-2 text-xs"
+                            onClick={() => addActivity(dayIndex, block)}
+                          >
+                            Add activity
+                          </Button>
                         </div>
 
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="px-3 py-2 text-xs"
-                          onClick={() => addActivity(dayIndex, block)}
-                        >
-                          Add activity
-                        </Button>
-                      </div>
+                        <div className="space-y-3">
+                          {day[block].length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
+                              No activities yet in this block.
+                            </div>
+                          ) : (
+                            day[block].map((activity, activityIndex) => (
+                              <div
+                                key={`${block}-${activityIndex}`}
+                                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                              >
+                                <div className="mb-3 flex flex-col gap-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                      Activity {activityIndex + 1}
+                                    </div>
 
-                      <div className="space-y-3">
-                        {day[block].length === 0 ? (
-                          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
-                            No activities yet in this block.
-                          </div>
-                        ) : (
-                          day[block].map((activity, activityIndex) => (
-                            <div
-                              key={`${block}-${activityIndex}`}
-                              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                            >
-                              <div className="mb-3 flex items-center justify-between gap-3">
-                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                  Activity {activityIndex + 1}
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      className="px-3 py-2 text-xs"
+                                      onClick={() =>
+                                        removeActivity(dayIndex, block, activityIndex)
+                                      }
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      className="px-3 py-2 text-xs"
+                                      onClick={() =>
+                                        moveActivityWithinBlock(
+                                          dayIndex,
+                                          block,
+                                          activityIndex,
+                                          "up"
+                                        )
+                                      }
+                                      disabled={activityIndex === 0}
+                                    >
+                                      ↑ Up
+                                    </Button>
+
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      className="px-3 py-2 text-xs"
+                                      onClick={() =>
+                                        moveActivityWithinBlock(
+                                          dayIndex,
+                                          block,
+                                          activityIndex,
+                                          "down"
+                                        )
+                                      }
+                                      disabled={activityIndex === day[block].length - 1}
+                                    >
+                                      ↓ Down
+                                    </Button>
+
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      className="px-3 py-2 text-xs"
+                                      onClick={() =>
+                                        moveActivityToAnotherBlock(
+                                          dayIndex,
+                                          block,
+                                          activityIndex,
+                                          "prev"
+                                        )
+                                      }
+                                      disabled={BLOCKS.indexOf(block) === 0}
+                                    >
+                                      ← Previous plan
+                                    </Button>
+
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      className="px-3 py-2 text-xs"
+                                      onClick={() =>
+                                        moveActivityToAnotherBlock(
+                                          dayIndex,
+                                          block,
+                                          activityIndex,
+                                          "next"
+                                        )
+                                      }
+                                      disabled={BLOCKS.indexOf(block) === BLOCKS.length - 1}
+                                    >
+                                      Next plan →
+                                    </Button>
+
+                                  </div>
                                 </div>
 
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  className="px-3 py-2 text-xs"
-                                  onClick={() => removeActivity(dayIndex, block, activityIndex)}
-                                >
-                                  Remove
-                                </Button>
-                              </div>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <Input
+                                    label="Title"
+                                    placeholder="e.g. Visit the Colosseum"
+                                    value={activity.title}
+                                    onChange={(e) =>
+                                      updateActivity(
+                                        dayIndex,
+                                        block,
+                                        activityIndex,
+                                        "title",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                  <Input
+                                    label="Location"
+                                    placeholder="e.g. Colosseum, Rome, Italy"
+                                    value={activity.location}
+                                    onChange={(e) =>
+                                      updateActivity(
+                                        dayIndex,
+                                        block,
+                                        activityIndex,
+                                        "location",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </div>
 
-                              <div className="grid gap-4 md:grid-cols-2">
-                                <Input
-                                  label="Title"
-                                  placeholder="e.g. Visit the Colosseum"
-                                  value={activity.title}
-                                  onChange={(e) =>
-                                    updateActivity(
-                                      dayIndex,
-                                      block,
-                                      activityIndex,
-                                      "title",
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                                <Input
-                                  label="Location"
-                                  placeholder="e.g. Colosseum, Rome, Italy"
-                                  value={activity.location}
-                                  onChange={(e) =>
-                                    updateActivity(
-                                      dayIndex,
-                                      block,
-                                      activityIndex,
-                                      "location",
-                                      e.target.value
-                                    )
-                                  }
-                                />
+                                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                  <Input
+                                    label="Duration (hours)"
+                                    type="number"
+                                    min="0"
+                                    step="0.5"
+                                    placeholder="e.g. 2"
+                                    value={activity.durationHours}
+                                    onChange={(e) =>
+                                      updateActivity(
+                                        dayIndex,
+                                        block,
+                                        activityIndex,
+                                        "durationHours",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+
+                                  <label className="block">
+                                    <div className="mb-1.5 text-sm font-semibold text-slate-700">
+                                      Notes
+                                    </div>
+                                    <textarea
+                                      value={activity.notes}
+                                      onChange={(e) =>
+                                        updateActivity(
+                                          dayIndex,
+                                          block,
+                                          activityIndex,
+                                          "notes",
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="Extra notes, reminders, or advice..."
+                                      className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                                    />
+                                  </label>
+                                </div>
                               </div>
-                            </div>
-                          ))
-                        )}
+                            ))
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <div className="mb-1.5 text-sm font-semibold text-slate-700">
-                      Food Suggestion
-                    </div>
-                    <textarea
-                      value={day.foodSuggestion}
-                      onChange={(e) => updateDay(dayIndex, "foodSuggestion", e.target.value)}
-                      placeholder="Recommended meal, restaurant style, or local specialty..."
-                      className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                    />
-                  </label>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block">
+                      <div className="mb-1.5 text-sm font-semibold text-slate-700">
+                        Food Suggestion
+                      </div>
+                      <textarea
+                        value={day.foodSuggestion}
+                        onChange={(e) => updateDay(dayIndex, "foodSuggestion", e.target.value)}
+                        placeholder="Recommended meal, restaurant style, or local specialty..."
+                        className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                      />
+                    </label>
 
-                  <label className="block">
-                    <div className="mb-1.5 text-sm font-semibold text-slate-700">
-                      Backup Plan
-                    </div>
-                    <textarea
-                      value={day.backupPlan}
-                      onChange={(e) => updateDay(dayIndex, "backupPlan", e.target.value)}
-                      placeholder="Alternative idea in case of weather or time issues..."
-                      className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                    />
-                  </label>
-                </div>
-              </CardBody>
-            </Card>
-          ))}
+                    <label className="block">
+                      <div className="mb-1.5 text-sm font-semibold text-slate-700">
+                        Backup Plan
+                      </div>
+                      <textarea
+                        value={day.backupPlan}
+                        onChange={(e) => updateDay(dayIndex, "backupPlan", e.target.value)}
+                        placeholder="Alternative idea in case of weather or time issues..."
+                        className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                      />
+                    </label>
+                  </div>
+                </CardBody>
+              </Card>
+            );
+          })}
         </div>
       </form>
     </div>

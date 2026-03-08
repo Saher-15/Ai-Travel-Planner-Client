@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { api } from "../api/client";
@@ -12,6 +12,18 @@ import {
   Input,
 } from "../components/UI.jsx";
 
+function formatDate(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
+}
+
+function truncateText(text, max = 60) {
+  const str = String(text || "");
+  return str.length > max ? `${str.slice(0, max)}...` : str;
+}
+
+const SUPPORT_PAGE_SIZE = 6;
+
 export default function Profile() {
   const nav = useNavigate();
   const { user, logout } = useAuth();
@@ -24,6 +36,12 @@ export default function Profile() {
   const [supportItems, setSupportItems] = useState([]);
   const [supportLoading, setSupportLoading] = useState(true);
   const [supportError, setSupportError] = useState("");
+  const [selectedSupportId, setSelectedSupportId] = useState(null);
+
+  const [supportQuery, setSupportQuery] = useState("");
+  const [supportFilter, setSupportFilter] = useState("all");
+  const [supportSort, setSupportSort] = useState("newest");
+  const [supportPage, setSupportPage] = useState(1);
 
   const showMessage = (text, type = "success") => {
     setMsg({ text, type });
@@ -42,7 +60,34 @@ export default function Profile() {
 
     try {
       const { data } = await api.get("/contact/my/messages");
-      setSupportItems(Array.isArray(data) ? data : []);
+      const items = Array.isArray(data) ? data : [];
+      setSupportItems(items);
+
+      if (items.length && !selectedSupportId) {
+        setSelectedSupportId(items[0]._id);
+      } else if (items.length && selectedSupportId) {
+        const stillExists = items.some((item) => item._id === selectedSupportId);
+        if (!stillExists) setSelectedSupportId(items[0]._id);
+      }
+
+      const hasUnreadReplies = items.some(
+        (item) =>
+          item.status === "replied" &&
+          item.adminReply &&
+          item.userReplySeen === false
+      );
+
+      if (hasUnreadReplies) {
+        await api.patch("/contact/my/messages/mark-replies-seen");
+
+        setSupportItems((prev) =>
+          prev.map((item) =>
+            item.status === "replied" && item.adminReply
+              ? { ...item, userReplySeen: true }
+              : item
+          )
+        );
+      }
     } catch (err) {
       setSupportError(
         err?.response?.data?.message || "Failed to load your support messages."
@@ -105,103 +150,240 @@ export default function Profile() {
     nav("/login");
   };
 
+  const repliedCount = supportItems.filter((item) => item.status === "replied").length;
+  const pendingCount = supportItems.filter((item) => item.status === "pending").length;
+
+  const filteredSupportItems = useMemo(() => {
+    const q = supportQuery.trim().toLowerCase();
+
+    let items = [...supportItems];
+
+    if (supportFilter === "replied") {
+      items = items.filter((item) => item.status === "replied");
+    } else if (supportFilter === "pending") {
+      items = items.filter((item) => item.status === "pending");
+    } else if (supportFilter === "unread") {
+      items = items.filter((item) => item.status === "replied" && !item.userReplySeen);
+    }
+
+    if (q) {
+      items = items.filter((item) => {
+        const subject = String(item.subject || "").toLowerCase();
+        const message = String(item.message || "").toLowerCase();
+        const reply = String(item.adminReply || "").toLowerCase();
+        return subject.includes(q) || message.includes(q) || reply.includes(q);
+      });
+    }
+
+    items.sort((a, b) => {
+      const aTime = new Date(a.createdAt || 0).getTime();
+      const bTime = new Date(b.createdAt || 0).getTime();
+      return supportSort === "oldest" ? aTime - bTime : bTime - aTime;
+    });
+
+    return items;
+  }, [supportItems, supportQuery, supportFilter, supportSort]);
+
+  const totalSupportPages = Math.max(
+    1,
+    Math.ceil(filteredSupportItems.length / SUPPORT_PAGE_SIZE)
+  );
+
+  const pagedSupportItems = useMemo(() => {
+    const start = (supportPage - 1) * SUPPORT_PAGE_SIZE;
+    return filteredSupportItems.slice(start, start + SUPPORT_PAGE_SIZE);
+  }, [filteredSupportItems, supportPage]);
+
+  useEffect(() => {
+    setSupportPage(1);
+  }, [supportQuery, supportFilter, supportSort]);
+
+  useEffect(() => {
+    if (supportPage > totalSupportPages) {
+      setSupportPage(totalSupportPages);
+    }
+  }, [supportPage, totalSupportPages]);
+
+  useEffect(() => {
+    if (!filteredSupportItems.length) {
+      setSelectedSupportId(null);
+      return;
+    }
+
+    const exists = filteredSupportItems.some((item) => item._id === selectedSupportId);
+    if (!exists) {
+      setSelectedSupportId(filteredSupportItems[0]._id);
+    }
+  }, [filteredSupportItems, selectedSupportId]);
+
+  const selectedSupport = useMemo(() => {
+    return filteredSupportItems.find((item) => item._id === selectedSupportId) || null;
+  }, [filteredSupportItems, selectedSupportId]);
+
   return (
-    <div className="grid gap-6 lg:grid-cols-12">
-      <div className="lg:col-span-5">
-        <Card className="overflow-hidden">
-          <div className="bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 p-6 text-white">
-            <Badge className="border-white/20 bg-white/15 text-white">
-              Account
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+        <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
+        <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
+
+        <div className="relative grid gap-6 p-6 lg:grid-cols-12 lg:p-8">
+          <div className="lg:col-span-8">
+            <Badge className="border-sky-200 bg-sky-50 text-sky-700">
+              Account Center
             </Badge>
 
-            <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-3xl">
-              Profile & settings
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              Profile & Security
             </h1>
 
-            <p className="mt-3 text-sm leading-6 text-white/90">
-              Manage your account details, security, and verification settings for
-              your travel planner experience.
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
+              Manage your account details, password security, email verification,
+              and support replies in one clean place designed for a more premium
+              travel planner experience.
             </p>
 
-            <div className="mt-6 grid gap-3">
-              <InfoCard
-                title="Account information"
-                text="Your profile details are shown here for reference and account identity."
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <HeroStat
+                title="Support messages"
+                value={supportItems.length}
+                subtitle="Total conversations"
               />
-              <InfoCard
-                title="Password security"
-                text="Keep your account secure by using a strong password and updating it when needed."
+              <HeroStat
+                title="Replies received"
+                value={repliedCount}
+                subtitle="Admin responses"
               />
-              <InfoCard
-                title="Support replies"
-                text="Messages from admin support will appear below in your profile."
+              <HeroStat
+                title="Pending"
+                value={pendingCount}
+                subtitle="Waiting for reply"
               />
             </div>
           </div>
-        </Card>
-      </div>
 
-      <div className="space-y-6 lg:col-span-7">
-        <Card>
-          <CardHeader
-            title="Your profile"
-            subtitle="View your account information and manage security settings"
-          />
-
-          <CardBody className="space-y-6">
-            {msg ? <Alert type={msg.type === "error" ? "error" : "success"}>{msg.text}</Alert> : null}
-
-            {!user?.verified && (
-              <Alert type="warning" className="space-y-3">
-                <div className="font-semibold">Your email is not verified.</div>
-                <div className="flex flex-wrap gap-3">
-                  <Button onClick={onResendVerification}>Resend Verification Email</Button>
-                </div>
-              </Alert>
-            )}
-
-            <div className="rounded-3xl border border-slate-200 bg-white p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-base font-bold text-slate-900">
-                    Profile information
-                  </div>
-                  <div className="text-sm text-slate-500">
-                    These details are currently read-only
-                  </div>
+          <div className="lg:col-span-4">
+            <div className="rounded-[1.75rem] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur">
+              <div className="flex items-center gap-4">
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-lg font-black text-white shadow-lg">
+                  {(user?.name || "T").trim().charAt(0).toUpperCase()}
                 </div>
 
-                <Badge>{user?.verified ? "Verified" : "Unverified"}</Badge>
+                <div className="min-w-0">
+                  <div className="truncate text-lg font-bold text-slate-900">
+                    {user?.name || "Traveler"}
+                  </div>
+                  <div className="truncate text-sm text-slate-500">
+                    {user?.email || "No email found"}
+                  </div>
+                </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label="Name"
-                  value={user?.name || ""}
-                  readOnly
-                  className="bg-slate-50 text-slate-600"
+              <div className="mt-5 grid gap-3">
+                <MiniInfo
+                  label="Account status"
+                  value={user?.verified ? "Verified" : "Not verified"}
+                  tone={user?.verified ? "success" : "warning"}
                 />
-
-                <Input
-                  label="Email"
-                  value={user?.email || ""}
-                  readOnly
-                  className="bg-slate-50 text-slate-600"
+                <MiniInfo
+                  label="Security"
+                  value="Password protected"
+                  tone="default"
+                />
+                <MiniInfo
+                  label="Support inbox"
+                  value={supportItems.length ? "Active" : "No messages yet"}
+                  tone="default"
                 />
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-5">
-              <div className="mb-4">
-                <div className="text-base font-bold text-slate-900">
-                  Change password
+      <div className="grid gap-6 xl:grid-cols-12">
+        <div className="space-y-6 xl:col-span-7">
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
+            <CardHeader
+              title="Account overview"
+              subtitle="Your main account details and email verification"
+            />
+
+            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+              {msg ? (
+                <Alert type={msg.type === "error" ? "error" : "success"}>
+                  {msg.text}
+                </Alert>
+              ) : null}
+
+              {!user?.verified && (
+                <div className="rounded-[1.5rem] border border-amber-200 bg-linear-to-r from-amber-50 to-yellow-50 p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="text-base font-bold text-amber-900">
+                        Your email is not verified
+                      </div>
+                      <div className="mt-1 text-sm leading-6 text-amber-800/80">
+                        Verify your email to improve account security and trust.
+                      </div>
+                    </div>
+
+                    <Button onClick={onResendVerification}>
+                      Resend Verification Email
+                    </Button>
+                  </div>
                 </div>
-                <div className="text-sm text-slate-500">
-                  Use a strong password to protect your account
+              )}
+
+              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-lg font-bold text-slate-900">
+                      Profile information
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      Your name and email are currently read-only
+                    </div>
+                  </div>
+
+                  <Badge
+                    className={
+                      user?.verified
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-amber-200 bg-amber-50 text-amber-700"
+                    }
+                  >
+                    {user?.verified ? "Verified" : "Unverified"}
+                  </Badge>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input
+                    label="Name"
+                    value={user?.name || ""}
+                    readOnly
+                    className="bg-slate-50 text-slate-600"
+                  />
+
+                  <Input
+                    label="Email"
+                    value={user?.email || ""}
+                    readOnly
+                    className="bg-slate-50 text-slate-600"
+                  />
                 </div>
               </div>
+            </CardBody>
+          </Card>
 
-              <div className="space-y-4">
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
+            <CardHeader
+              title="Change password"
+              subtitle="Keep your account secure with a stronger password"
+            />
+
+            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+              <div className="grid gap-4">
                 <Input
                   label="Current Password"
                   type="password"
@@ -225,112 +407,441 @@ export default function Profile() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
+              </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Button variant="primary" onClick={onChangePassword}>
-                    Update Password
-                  </Button>
-
-                  <div className="text-xs text-slate-500">
-                    Must include uppercase, lowercase, number, and special character.
-                  </div>
+              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-bold text-slate-800">
+                  Password requirements
+                </div>
+                <div className="mt-2 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                  <div>• At least 8 characters</div>
+                  <div>• One uppercase letter</div>
+                  <div>• One lowercase letter</div>
+                  <div>• One number</div>
+                  <div>• One special character</div>
                 </div>
               </div>
-            </div>
 
-            <Card className="border border-slate-200">
-              <CardHeader
-                title="My support messages"
-                subtitle="Replies from admin will appear here"
-                right={
-                  <Button variant="secondary" onClick={loadMySupportMessages} disabled={supportLoading}>
-                    Refresh
-                  </Button>
-                }
-              />
-              <CardBody className="space-y-4">
-                {supportError ? <Alert type="error">{supportError}</Alert> : null}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-slate-500">
+                  Update your password regularly to keep your account safe.
+                </div>
 
-                {supportLoading ? (
-                  <div className="text-sm text-slate-500">Loading support messages...</div>
-                ) : supportItems.length === 0 ? (
-                  <Alert type="info">You have not sent any support messages yet.</Alert>
-                ) : (
-                  <div className="space-y-4">
-                    {supportItems.map((item) => (
-                      <div
-                        key={item._id}
-                        className="rounded-3xl border border-slate-200 bg-white p-5"
+                <Button variant="primary" onClick={onChangePassword}>
+                  Update Password
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+
+        <div className="space-y-6 xl:col-span-5">
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
+            <CardHeader
+              title="Support inbox"
+              subtitle="Messages and replies from admin support"
+              right={
+                <Button
+                  variant="secondary"
+                  onClick={loadMySupportMessages}
+                  disabled={supportLoading}
+                >
+                  Refresh
+                </Button>
+              }
+            />
+
+            <CardBody className="space-y-4 bg-linear-to-b from-white to-slate-50/60">
+              {supportError ? <Alert type="error">{supportError}</Alert> : null}
+
+              {supportLoading ? (
+                <SkeletonTable />
+              ) : supportItems.length === 0 ? (
+                <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white p-8 text-center">
+                  <div className="text-lg font-bold text-slate-900">
+                    No support messages yet
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-500">
+                    When you contact support, your messages and admin replies will
+                    appear here.
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input
+                      label="Search"
+                      placeholder="Search subject or message"
+                      value={supportQuery}
+                      onChange={(e) => setSupportQuery(e.target.value)}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <SelectBox
+                        label="Filter"
+                        value={supportFilter}
+                        onChange={(e) => setSupportFilter(e.target.value)}
+                        options={[
+                          { value: "all", label: "All" },
+                          { value: "replied", label: "Replied" },
+                          { value: "pending", label: "Pending" },
+                          { value: "unread", label: "Unread" },
+                        ]}
+                      />
+
+                      <SelectBox
+                        label="Sort"
+                        value={supportSort}
+                        onChange={(e) => setSupportSort(e.target.value)}
+                        options={[
+                          { value: "newest", label: "Newest" },
+                          { value: "oldest", label: "Oldest" },
+                        ]}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                    <div className="text-slate-600">
+                      Showing <span className="font-bold text-slate-900">{pagedSupportItems.length}</span> of{" "}
+                      <span className="font-bold text-slate-900">{filteredSupportItems.length}</span> messages
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className="border-slate-200 bg-slate-50 text-slate-700">
+                        Page {supportPage} / {totalSupportPages}
+                      </Badge>
+                      {supportFilter !== "all" || supportQuery || supportSort !== "newest" ? (
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setSupportQuery("");
+                            setSupportFilter("all");
+                            setSupportSort("newest");
+                          }}
+                        >
+                          Reset
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
+                    <div className="max-h-[360px] overflow-auto">
+                      <table className="min-w-full border-collapse text-sm">
+                        <thead className="sticky top-0 z-10 bg-slate-50">
+                          <tr className="border-b border-slate-200">
+                            <th className="px-4 py-3 text-left font-bold text-slate-600">
+                              Subject
+                            </th>
+                            <th className="px-4 py-3 text-left font-bold text-slate-600">
+                              Status
+                            </th>
+                            <th className="px-4 py-3 text-left font-bold text-slate-600">
+                              Sent
+                            </th>
+                            <th className="px-4 py-3 text-left font-bold text-slate-600">
+                              Reply
+                            </th>
+                            <th className="px-4 py-3 text-right font-bold text-slate-600">
+                              Action
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {pagedSupportItems.map((item) => {
+                            const active = selectedSupportId === item._id;
+
+                            return (
+                              <tr
+                                key={item._id}
+                                tabIndex={0}
+                                role="button"
+                                aria-pressed={active}
+                                onClick={() => setSelectedSupportId(item._id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setSelectedSupportId(item._id);
+                                  }
+                                }}
+                                className={`cursor-pointer border-b border-slate-100 transition outline-none ${
+                                  active
+                                    ? "bg-sky-50/70"
+                                    : "hover:bg-slate-50 focus:bg-slate-50"
+                                }`}
+                              >
+                                <td className="px-4 py-3 align-top">
+                                  <div className="font-semibold text-slate-900">
+                                    {truncateText(item.subject, 38)}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {truncateText(item.message, 50)}
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3 align-top">
+                                  {item.status === "replied" ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      <Badge className="border-sky-200 bg-sky-50 text-sky-700">
+                                        Replied
+                                      </Badge>
+                                      {!item.userReplySeen && (
+                                        <Badge className="border-red-200 bg-red-50 text-red-700">
+                                          New
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <Badge className="border-amber-200 bg-amber-50 text-amber-700">
+                                      Pending
+                                    </Badge>
+                                  )}
+                                </td>
+
+                                <td className="px-4 py-3 align-top text-slate-600">
+                                  <div className="whitespace-nowrap">
+                                    {formatDate(item.createdAt)}
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3 align-top">
+                                  {item.adminReply ? (
+                                    <span className="font-medium text-emerald-700">
+                                      Yes
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400">No</span>
+                                  )}
+                                </td>
+
+                                <td className="px-4 py-3 align-top text-right">
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                      variant={active ? "primary" : "secondary"}
+                                      onClick={() => setSelectedSupportId(item._id)}
+                                    >
+                                      {active ? "Opened" : "View"}
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {totalSupportPages > 1 ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <Button
+                        variant="secondary"
+                        disabled={supportPage === 1}
+                        onClick={() => setSupportPage((p) => Math.max(1, p - 1))}
                       >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <div className="text-base font-bold text-slate-900">
-                              {item.subject}
-                            </div>
-                            <div className="mt-1 text-xs text-slate-400">
-                              Sent on {new Date(item.createdAt).toLocaleString()}
-                            </div>
-                          </div>
+                        Previous
+                      </Button>
 
-                          {item.status === "replied" ? (
-                            <Badge className="border-sky-200 bg-sky-50 text-sky-700">
-                              Replied
-                            </Badge>
-                          ) : (
-                            <Badge className="border-amber-200 bg-amber-50 text-amber-700">
-                              Pending
-                            </Badge>
-                          )}
+                      <div className="text-sm text-slate-500">
+                        Page {supportPage} of {totalSupportPages}
+                      </div>
+
+                      <Button
+                        variant="secondary"
+                        disabled={supportPage === totalSupportPages}
+                        onClick={() =>
+                          setSupportPage((p) => Math.min(totalSupportPages, p + 1))
+                        }
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {selectedSupport ? (
+                    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="text-lg font-bold text-slate-900">
+                            {selectedSupport.subject}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Sent on {formatDate(selectedSupport.createdAt)}
+                          </div>
                         </div>
 
-                        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Your message
-                          </div>
-                          <div className="mt-2 text-sm leading-6 text-slate-700">
-                            {item.message}
-                          </div>
-                        </div>
+                        {selectedSupport.status === "replied" ? (
+                          <Badge className="border-sky-200 bg-sky-50 text-sky-700">
+                            Replied
+                          </Badge>
+                        ) : (
+                          <Badge className="border-amber-200 bg-amber-50 text-amber-700">
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
 
-                        {item.adminReply ? (
-                          <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 p-4">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          Your message
+                        </div>
+                        <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                          {selectedSupport.message}
+                        </div>
+                      </div>
+
+                      {selectedSupport.adminReply ? (
+                        <div className="mt-4 rounded-2xl border border-sky-100 bg-linear-to-r from-sky-50 to-indigo-50 p-4">
+                          <div className="flex items-center gap-2">
+                            <div className="grid h-8 w-8 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">
+                              A
+                            </div>
+                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700">
                               Admin reply
                             </div>
-                            <div className="mt-2 text-sm leading-6 text-slate-700">
-                              {item.adminReply}
-                            </div>
-                            {item.repliedAt ? (
-                              <div className="mt-2 text-xs text-slate-500">
-                                Replied on {new Date(item.repliedAt).toLocaleString()}
-                              </div>
-                            ) : null}
                           </div>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardBody>
-            </Card>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button variant="danger" onClick={onLogout}>
-                Logout
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
+                          <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                            {selectedSupport.adminReply}
+                          </div>
+
+                          {selectedSupport.repliedAt ? (
+                            <div className="mt-3 text-xs text-slate-500">
+                              Replied on {formatDate(selectedSupport.repliedAt)}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                          No admin reply yet for this message.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+                      Select a message to view its full details.
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
+            <CardHeader
+              title="Session"
+              subtitle="Manage your current login session"
+            />
+
+            <CardBody className="bg-linear-to-b from-white to-slate-50/60">
+              <div className="rounded-[1.5rem] border border-rose-100 bg-linear-to-r from-rose-50 to-white p-5">
+                <div className="text-base font-bold text-slate-900">
+                  Logout from your account
+                </div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">
+                  End your current session securely from this device.
+                </div>
+
+                <div className="mt-5">
+                  <Button variant="danger" onClick={onLogout}>
+                    Logout
+                  </Button>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
       </div>
     </div>
   );
 }
 
-function InfoCard({ title, text }) {
+function HeroStat({ title, value, subtitle }) {
   return (
-    <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-      <div className="text-sm font-bold text-white">{title}</div>
-      <div className="mt-1 text-sm leading-6 text-white/85">{text}</div>
+    <div className="rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+      <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+        {title}
+      </div>
+      <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+        {value}
+      </div>
+      <div className="mt-1 text-sm text-slate-500">{subtitle}</div>
+    </div>
+  );
+}
+
+function MiniInfo({ label, value, tone = "default" }) {
+  const toneClasses =
+    tone === "success"
+      ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+      : tone === "warning"
+      ? "bg-amber-50 border-amber-100 text-amber-700"
+      : "bg-slate-50 border-slate-200 text-slate-700";
+
+  return (
+    <div className={`rounded-2xl border px-4 py-3 ${toneClasses}`}>
+      <div className="text-xs font-bold uppercase tracking-[0.14em] opacity-80">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function SelectBox({ label, value, onChange, options }) {
+  return (
+    <label className="block">
+      <div className="mb-1.5 text-sm font-semibold text-slate-700">{label}</div>
+      <select
+        value={value}
+        onChange={onChange}
+        className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+      >
+        {options.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SkeletonTable() {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="h-16 animate-pulse rounded-[1rem] bg-slate-100" />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-16 animate-pulse rounded-[1rem] bg-slate-100" />
+          <div className="h-16 animate-pulse rounded-[1rem] bg-slate-100" />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="grid grid-cols-5 gap-3 px-4 py-4">
+              <div className="space-y-2">
+                <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+                <div className="h-3 w-36 animate-pulse rounded bg-slate-100" />
+              </div>
+              <div className="h-6 w-20 animate-pulse rounded-full bg-slate-100" />
+              <div className="h-4 w-28 animate-pulse rounded bg-slate-100" />
+              <div className="h-4 w-10 animate-pulse rounded bg-slate-100" />
+              <div className="ml-auto h-9 w-20 animate-pulse rounded-2xl bg-slate-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="h-40 animate-pulse rounded-[1.5rem] bg-slate-100" />
     </div>
   );
 }

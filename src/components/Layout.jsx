@@ -2,10 +2,39 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { Button } from "../components/UI.jsx";
+import { api } from "../api/client.js";
 
 const cx = (...c) => c.filter(Boolean).join(" ");
 
-function NavItem({ to, onClick, children, mobile = false }) {
+const DEVELOPER_LINKEDIN =
+  "https://www.linkedin.com/in/saher-saadi-a637b11b5/";
+
+function NavBadge({ count, mobile = false, active = false }) {
+  if (!count || count < 1) return null;
+
+  return (
+    <span
+      className={cx(
+        "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold",
+        mobile
+          ? "ml-auto bg-red-500 text-white"
+          : active
+          ? "bg-white text-sky-700"
+          : "bg-red-500 text-white"
+      )}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+function NavItem({
+  to,
+  onClick,
+  children,
+  mobile = false,
+  badgeCount = 0,
+}) {
   const base = mobile
     ? "flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold transition"
     : "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition";
@@ -18,14 +47,20 @@ function NavItem({ to, onClick, children, mobile = false }) {
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={cx(base, idle)}>
-        {children}
+        <span>{children}</span>
+        <NavBadge count={badgeCount} mobile={mobile} />
       </button>
     );
   }
 
   return (
     <NavLink to={to} className={({ isActive }) => cx(base, isActive ? active : idle)}>
-      {children}
+      {({ isActive }) => (
+        <>
+          <span>{children}</span>
+          <NavBadge count={badgeCount} mobile={mobile} active={isActive} />
+        </>
+      )}
     </NavLink>
   );
 }
@@ -37,8 +72,8 @@ function Brand() {
         className={cx(
           "grid h-11 w-11 shrink-0 place-items-center rounded-2xl",
           "bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-white",
-          "shadow-[0_10px_30px_-12px_rgba(37,99,235,0.45)] ring-1 ring-sky-900/10",
-          "transition duration-300 group-hover:scale-[1.03]"
+          "shadow-[0_12px_35px_-12px_rgba(37,99,235,0.55)] ring-1 ring-sky-900/10",
+          "transition duration-300 group-hover:scale-[1.03] group-hover:shadow-[0_18px_40px_-16px_rgba(37,99,235,0.55)]"
         )}
       >
         <span className="text-sm font-extrabold tracking-tight">TP</span>
@@ -113,12 +148,44 @@ function FooterLink({ to, children }) {
   );
 }
 
+function FooterExternalLink({ href, children }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="text-sm text-slate-500 transition hover:text-sky-700"
+    >
+      {children}
+    </a>
+  );
+}
+
+function TopInfoBar({ isLoggedIn }) {
+  return (
+    <div className="border-b border-sky-100 bg-linear-to-r from-sky-50 via-white to-indigo-50">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2 text-xs sm:px-6">
+        <div className="font-semibold text-slate-600">
+          Plan smarter trips with a cleaner and stronger travel experience.
+        </div>
+
+        <div className="flex items-center gap-4 text-slate-500">
+          <span>Modern planner UI</span>
+          <span className="hidden sm:inline">•</span>
+          <span>Structured itineraries</span>
+          <span className="hidden sm:inline">•</span>
+          <span>{isLoggedIn ? "Your trips are ready" : "Start your next journey"}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Footer({ isLoggedIn, isAdmin }) {
   return (
-    <footer className="mt-12 border-t border-slate-200 bg-white/80 backdrop-blur">
+    <footer className="mt-12 border-t border-slate-200 bg-white/85 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="grid gap-10 md:grid-cols-2 xl:grid-cols-4">
-          {/* BRAND */}
           <div className="space-y-4">
             <Link to="/" className="inline-flex items-center gap-3">
               <div className="grid h-11 w-11 place-items-center rounded-2xl bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-[0_10px_30px_-12px_rgba(37,99,235,0.45)]">
@@ -137,11 +204,30 @@ function Footer({ isLoggedIn, isAdmin }) {
 
             <p className="max-w-sm text-sm leading-6 text-slate-600">
               Create smart travel itineraries, organize your journeys, and enjoy a
-              clean premium planning experience focused on inspiration and structure.
+              clean premium planning experience focused on inspiration, structure,
+              and ease of use.
             </p>
+
+            <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-4 shadow-sm">
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
+                Website Developer
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-800">
+                Developed by Saher Saadi
+              </div>
+              <div className="mt-2">
+                <a
+                  href={DEVELOPER_LINKEDIN}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-sky-500"
+                >
+                  View LinkedIn
+                </a>
+              </div>
+            </div>
           </div>
 
-          {/* NAVIGATION */}
           <div>
             <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
               Navigation
@@ -156,42 +242,56 @@ function Footer({ isLoggedIn, isAdmin }) {
             </div>
           </div>
 
-          {/* PRODUCT */}
           <div>
             <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
-              Planner
+              Planner Features
             </h3>
             <div className="mt-4 space-y-3 text-sm text-slate-600">
               <p>AI itinerary generation</p>
-              <p>Smart daily planning flow</p>
-              <p>Destination-first experience</p>
+              <p>Smart daily trip structure</p>
+              <p>Clean destination-first planning</p>
               <p>Saved personal trip library</p>
+              <p>Responsive premium experience</p>
             </div>
           </div>
 
-          {/* CTA / NOTE */}
           <div>
             <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
               Start your next journey
             </h3>
             <p className="mt-4 text-sm leading-6 text-slate-600">
-              Turn your destination idea into a structured and inspiring travel plan.
+              Turn your destination idea into a structured and inspiring travel plan
+              in a stronger and more professional interface.
             </p>
 
-            <div className="mt-5">
+            <div className="mt-5 flex flex-col gap-3">
               <Link
                 to="/create"
                 className="inline-flex items-center justify-center rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-500 hover:shadow-md"
               >
                 Create a Trip
               </Link>
+
+              <FooterExternalLink href={DEVELOPER_LINKEDIN}>
+                Developer LinkedIn
+              </FooterExternalLink>
             </div>
           </div>
         </div>
 
         <div className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} Travel Planner. All rights reserved.</p>
-          <p>Designed for smarter travel planning.</p>
+          <p>
+            Designed and developed by{" "}
+            <a
+              href={DEVELOPER_LINKEDIN}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-sky-700 hover:text-sky-600"
+            >
+              Saher Saadi
+            </a>
+          </p>
         </div>
       </div>
     </footer>
@@ -204,6 +304,7 @@ export default function Layout({ children }) {
   const { isLoggedIn, user, logout } = useAuth();
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadReplyCount, setUnreadReplyCount] = useState(0);
 
   const closeMobileMenu = () => setMobileOpen(false);
 
@@ -211,9 +312,36 @@ export default function Layout({ children }) {
     closeMobileMenu();
   }, [location.pathname]);
 
+  const loadUnreadReplyCount = async () => {
+    if (!isLoggedIn) {
+      setUnreadReplyCount(0);
+      return;
+    }
+
+    try {
+      const { data } = await api.get("/contact/my/messages/unread-count");
+      setUnreadReplyCount(Number(data?.count || 0));
+    } catch {
+      setUnreadReplyCount(0);
+    }
+  };
+
+  useEffect(() => {
+    loadUnreadReplyCount();
+
+    if (!isLoggedIn) return;
+
+    const timer = setInterval(() => {
+      loadUnreadReplyCount();
+    }, 20000);
+
+    return () => clearInterval(timer);
+  }, [isLoggedIn, location.pathname]);
+
   const onLogout = async () => {
     closeMobileMenu();
     await logout();
+    setUnreadReplyCount(0);
     navigate("/login");
   };
 
@@ -221,13 +349,13 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-linear-to-b from-sky-50 via-white to-slate-100">
-      {/* GLOBAL HEADER */}
-      <header className="sticky top-0 z-200 border-b border-slate-200/70 bg-white/85 backdrop-blur-xl supports-backdrop-filter:bg-white/75">
+      <TopInfoBar isLoggedIn={isLoggedIn} />
+
+      <header className="sticky top-0 z-200 border-b border-slate-200/70 bg-white/85 shadow-[0_8px_30px_-20px_rgba(15,23,42,0.35)] backdrop-blur-xl supports-backdrop-filter:bg-white/75">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <Brand />
 
-            {/* DESKTOP NAV */}
             <div className="hidden items-center gap-3 md:flex">
               <nav className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white/90 p-1.5 shadow-sm">
                 {isLoggedIn ? (
@@ -236,7 +364,9 @@ export default function Layout({ children }) {
                     <NavItem to="/create">Create Trip</NavItem>
                     <NavItem to="/trips">My Trips</NavItem>
                     <NavItem to="/contact">Contact</NavItem>
-                    <NavItem to="/profile">Profile</NavItem>
+                    <NavItem to="/profile" badgeCount={unreadReplyCount}>
+                      Profile
+                    </NavItem>
                     {isAdmin ? <NavItem to="/admin/contacts">Admin</NavItem> : null}
                   </>
                 ) : (
@@ -266,7 +396,6 @@ export default function Layout({ children }) {
               )}
             </div>
 
-            {/* MOBILE TOGGLE */}
             <MobileMenuButton
               open={mobileOpen}
               onClick={() => setMobileOpen((v) => !v)}
@@ -274,7 +403,6 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* MOBILE MENU */}
         <div
           className={cx(
             "overflow-hidden border-t border-slate-200 bg-white/95 backdrop-blur-xl transition-all duration-300 md:hidden",
@@ -316,7 +444,7 @@ export default function Layout({ children }) {
                   <NavItem to="/contact" mobile>
                     Contact
                   </NavItem>
-                  <NavItem to="/profile" mobile>
+                  <NavItem to="/profile" mobile badgeCount={unreadReplyCount}>
                     Profile
                   </NavItem>
                   {isAdmin ? (
@@ -351,6 +479,15 @@ export default function Layout({ children }) {
                       Plan a Trip
                     </Link>
                   </div>
+
+                  <a
+                    href={DEVELOPER_LINKEDIN}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  >
+                    Website Developer
+                  </a>
                 </>
               )}
             </nav>
@@ -358,7 +495,6 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* EMAIL VERIFICATION BANNER */}
       {isLoggedIn && user && !user.verified && (
         <div className="relative z-190 border-b border-amber-300 bg-linear-to-r from-amber-50 to-yellow-50">
           <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-3 text-center text-sm font-semibold text-amber-800 sm:px-6">
@@ -375,10 +511,8 @@ export default function Layout({ children }) {
         </div>
       )}
 
-      {/* PAGE WRAPPER */}
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-6">{children}</main>
 
-      {/* FOOTER */}
       <Footer isLoggedIn={isLoggedIn} isAdmin={isAdmin} />
     </div>
   );
