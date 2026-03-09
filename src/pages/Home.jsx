@@ -265,24 +265,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TRUST / PROJECT VALUE */}
-      <section className="grid gap-4 md:grid-cols-3">
-        <TrustItem
-          title="Clear project identity"
-          text="Your homepage now matches what your app really does: creating smart travel plans."
-          icon="🎯"
-        />
-        <TrustItem
-          title="Better user experience"
-          text="Users instantly understand the product without getting distracted by fake booking features."
-          icon="🎨"
-        />
-        <TrustItem
-          title="Stronger portfolio impact"
-          text="A focused planner product looks more professional in demos, GitHub, and interviews."
-          icon="🚀"
-        />
-      </section>
 
       {/* HOW IT WORKS */}
       <section className="space-y-6">

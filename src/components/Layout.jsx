@@ -161,25 +161,6 @@ function FooterExternalLink({ href, children }) {
   );
 }
 
-function TopInfoBar({ isLoggedIn }) {
-  return (
-    <div className="border-b border-sky-100 bg-linear-to-r from-sky-50 via-white to-indigo-50">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2 text-xs sm:px-6">
-        <div className="font-semibold text-slate-600">
-          Plan smarter trips with a cleaner and stronger travel experience.
-        </div>
-
-        <div className="flex items-center gap-4 text-slate-500">
-          <span>Modern planner UI</span>
-          <span className="hidden sm:inline">•</span>
-          <span>Structured itineraries</span>
-          <span className="hidden sm:inline">•</span>
-          <span>{isLoggedIn ? "Your trips are ready" : "Start your next journey"}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function Footer({ isLoggedIn, isAdmin }) {
   return (
@@ -349,8 +330,6 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-linear-to-b from-sky-50 via-white to-slate-100">
-      <TopInfoBar isLoggedIn={isLoggedIn} />
-
       <header className="sticky top-0 z-200 border-b border-slate-200/70 bg-white/85 shadow-[0_8px_30px_-20px_rgba(15,23,42,0.35)] backdrop-blur-xl supports-backdrop-filter:bg-white/75">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-4">
