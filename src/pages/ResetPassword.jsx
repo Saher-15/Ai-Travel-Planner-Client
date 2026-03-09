@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { Card, CardHeader, CardBody, Input, Button, Alert } from "../components/UI";
@@ -7,7 +7,11 @@ export default function ResetPassword() {
   const { token } = useParams();
   const nav = useNavigate();
 
-  
+  // 🔥 Add this to give this page its own title in GA4
+  useEffect(() => {
+    document.title = "Reset Password – Travel Planner";
+  }, []);
+
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -70,6 +74,7 @@ export default function ResetPassword() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
+
             <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
               <div className="text-sm font-bold text-slate-800">
                 Password requirements
@@ -82,6 +87,7 @@ export default function ResetPassword() {
                 <div>• One special character</div>
               </div>
             </div>
+
             {msg && <Alert type="success">{msg}</Alert>}
             {err && <Alert type="error">{err}</Alert>}
 
