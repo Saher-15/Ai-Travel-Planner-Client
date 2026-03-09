@@ -69,7 +69,18 @@ export default function ResetPassword() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
-
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-bold text-slate-800">
+                Password requirements
+              </div>
+              <div className="mt-2 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                <div>• At least 8 characters</div>
+                <div>• One uppercase letter</div>
+                <div>• One lowercase letter</div>
+                <div>• One number</div>
+                <div>• One special character</div>
+              </div>
+            </div>
             {msg && <Alert type="success">{msg}</Alert>}
             {err && <Alert type="error">{err}</Alert>}
 
