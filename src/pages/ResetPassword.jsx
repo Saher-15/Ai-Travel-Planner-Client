@@ -7,6 +7,10 @@ export default function ResetPassword() {
   const { token } = useParams();
   const nav = useNavigate();
 
+  useEffect(() => {
+    document.title = "Reset Password – Travel Planner";
+  }, []);
+  
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
