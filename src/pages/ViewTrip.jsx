@@ -15,6 +15,7 @@ const BLOCKS = ["morning", "afternoon", "evening"];
 const BLOCK_ORDER = { morning: 1, afternoon: 2, evening: 3 };
 
 const fmtRange = (s, e) => (s && e ? `${s} → ${e}` : "");
+
 const clamp = (s, n = 120) => {
   const str = (s ?? "").toString();
   return str.length > n ? `${str.slice(0, n - 1)}…` : str;
@@ -64,14 +65,14 @@ function extractUniqueLocations(itinerary) {
 function extractRecommendedPlaces(itinerary) {
   const rows = Array.isArray(itinerary?.recommendedPlaces)
     ? itinerary.recommendedPlaces
-        .map((p, index) => ({
-          id: `${p?.name || "place"}-${index}`,
-          name: (p?.name || "Recommended Place").trim(),
-          reason: (p?.reason || "").trim(),
-          category: (p?.category || "").trim(),
-          location: (p?.location || "").trim(),
-        }))
-        .filter((p) => p.location)
+      .map((p, index) => ({
+        id: `${p?.name || "place"}-${index}`,
+        name: (p?.name || "Recommended Place").trim(),
+        reason: (p?.reason || "").trim(),
+        category: (p?.category || "").trim(),
+        location: (p?.location || "").trim(),
+      }))
+      .filter((p) => p.location)
     : [];
 
   return Array.from(
@@ -122,7 +123,10 @@ function useAsync(fn, deps) {
           setState({
             data: null,
             loading: false,
-            error: e?.response?.data?.message || e?.message || "Something went wrong",
+            error:
+              e?.response?.data?.message ||
+              e?.message ||
+              "Something went wrong",
           });
         }
       }
@@ -138,14 +142,18 @@ function useAsync(fn, deps) {
 }
 
 function useGeoPoints(locations) {
+  const stableLocations = useMemo(() => {
+    return Array.isArray(locations) ? locations.filter((x) => x?.location) : [];
+  }, [locations]);
+
   return useAsync(async () => {
-    if (!locations.length) return { points: [], failed: [] };
+    if (!stableLocations.length) return { points: [], failed: [] };
 
     const normalize = (s) => String(s || "").trim().toLowerCase();
     const includesCity = (text, city) =>
       normalize(text).includes(normalize(city));
 
-    const queries = locations.map((p) => p.location);
+    const queries = stableLocations.map((p) => p.location);
     const { data: geo } = await api.post("/geocode/batch", { queries });
 
     const results = Array.isArray(geo?.results) ? geo.results : [];
@@ -155,14 +163,16 @@ function useGeoPoints(locations) {
     const failed = [];
 
     async function retrySingle(forcedQuery) {
-      const { data } = await api.post("/geocode/batch", { queries: [forcedQuery] });
+      const { data } = await api.post("/geocode/batch", {
+        queries: [forcedQuery],
+      });
       const r = Array.isArray(data?.results) ? data.results[0] : null;
       return r && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lon))
         ? r
         : null;
     }
 
-    for (const p of locations) {
+    for (const p of stableLocations) {
       const q = p.location.trim();
       const qNorm = normalize(q);
 
@@ -173,7 +183,6 @@ function useGeoPoints(locations) {
 
       const wantsParis = qNorm.includes("paris");
       const hitName = hit?.display_name || "";
-
       const looksWrongCity = wantsParis && hit && !includesCity(hitName, "paris");
 
       if (!Number.isFinite(hitLat) || !Number.isFinite(hitLon) || looksWrongCity) {
@@ -191,8 +200,8 @@ function useGeoPoints(locations) {
             reason: !hit
               ? "No match returned"
               : looksWrongCity
-              ? "Matched wrong city (retry failed)"
-              : "No lat/lon returned",
+                ? "Matched wrong city (retry failed)"
+                : "No lat/lon returned",
           });
           continue;
         }
@@ -210,12 +219,12 @@ function useGeoPoints(locations) {
           ...p,
           lat,
           lon,
-          photoUrl: detail?.photoUrl ?? null,
           displayName: detail?.display_name ?? hit?.display_name ?? null,
           category: p?.category || detail?.category || null,
           type: detail?.type ?? null,
           address: detail?.address ?? null,
-          wikipedia: detail?.wikipedia ?? null,
+          photoUrl: detail?.photoUrl ?? null,
+          photoAttribution: detail?.photoAttribution ?? null,
         });
       } catch {
         points.push({
@@ -228,7 +237,7 @@ function useGeoPoints(locations) {
     }
 
     return { points, failed };
-  }, [locations]);
+  }, [stableLocations]);
 }
 
 function useDestinationWeather(destination, fallbackPoint) {
@@ -275,7 +284,12 @@ function useDestinationWeather(destination, fallbackPoint) {
       current: weather?.current ?? null,
       daily: weather?.daily ?? null,
     };
-  }, [destination, fallbackPoint?.lat, fallbackPoint?.lon, fallbackPoint?.displayName]);
+  }, [
+    destination,
+    fallbackPoint?.lat,
+    fallbackPoint?.lon,
+    fallbackPoint?.displayName,
+  ]);
 }
 
 function weatherCodeToLabel(code) {
@@ -332,6 +346,12 @@ function dayName(dateStr) {
   return d.toLocaleDateString(undefined, { weekday: "short" });
 }
 
+function scrollToDay(dayNumber) {
+  const el = document.getElementById(`day-${dayNumber}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 export default function ViewTrip() {
   const nav = useNavigate();
   const { id } = useParams();
@@ -344,8 +364,8 @@ export default function ViewTrip() {
   const primaryDestination = destinations[0] || trip?.destination || "";
 
   const pdfRef = useRef(null);
-
   const [openDays, setOpenDays] = useState({});
+  const [downloadError, setDownloadError] = useState("");
 
   useEffect(() => {
     if (!trip?.itinerary?.days?.length) return;
@@ -355,6 +375,38 @@ export default function ViewTrip() {
     });
     setOpenDays(next);
   }, [trip]);
+
+  const locations = useMemo(() => extractUniqueLocations(trip?.itinerary), [trip]);
+  const recommendedPlaces = useMemo(
+    () => extractRecommendedPlaces(trip?.itinerary),
+    [trip]
+  );
+  const examples = useMemo(() => locations.slice(0, 3).map((x) => x.location), [locations]);
+
+  const geoState = useGeoPoints(locations);
+  const mapPoints = geoState.data?.points ?? [];
+  const geoFailed = geoState.data?.failed ?? [];
+
+  const recommendedGeoState = useGeoPoints(recommendedPlaces);
+  const recommendedPoints = recommendedGeoState.data?.points ?? [];
+
+  const weatherState = useDestinationWeather(primaryDestination, mapPoints[0]);
+
+  const totalActivities = useMemo(() => {
+    return (trip?.itinerary?.days || []).reduce(
+      (sum, day) => sum + countDayActivities(day),
+      0
+    );
+  }, [trip]);
+
+  const totalHours = useMemo(() => {
+    return (trip?.itinerary?.days || []).reduce(
+      (sum, day) => sum + getDayEstimatedHours(day),
+      0
+    );
+  }, [trip]);
+
+  const mapPlaceCount = useMemo(() => locations.length || 0, [locations]);
 
   const toggleDay = (dayNumber) => {
     setOpenDays((prev) => ({
@@ -379,61 +431,52 @@ export default function ViewTrip() {
     setOpenDays(next);
   };
 
-const downloadPDF = async () => {
-  try {
-    const res = await api.get(`/trips/${id}/pdf`, { responseType: "blob" });
+  const handleJumpToDay = (dayNumber) => {
+    setOpenDays((prev) => ({
+      ...prev,
+      [dayNumber]: true,
+    }));
 
-    const contentType = res?.headers?.["content-type"] || "";
-    if (!contentType.includes("pdf")) {
-      throw new Error("Invalid PDF response");
+    requestAnimationFrame(() => {
+      scrollToDay(dayNumber);
+    });
+  };
+
+  const downloadPDF = async () => {
+    setDownloadError("");
+
+    try {
+      const res = await api.get(`/trips/${id}/pdf`, { responseType: "blob" });
+
+      const contentType = res?.headers?.["content-type"] || "";
+      if (!contentType.includes("pdf")) {
+        throw new Error("Invalid PDF response");
+      }
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const safeName = (trip?.destination || "planner")
+        .toString()
+        .replace(/[^\w\s-]/g, "")
+        .trim()
+        .replace(/\s+/g, "-");
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `trip-${safeName || "planner"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download PDF error:", err);
+      setDownloadError(
+        err?.response?.data?.message || err?.message || "Failed to download PDF."
+      );
     }
-
-    const blob = new Blob([res.data], { type: "application/pdf" });
-    const url = window.URL.createObjectURL(blob);
-
-    const safeName = (trip?.destination || "planner")
-      .toString()
-      .replace(/[^\w\s-]/g, "")
-      .trim()
-      .replace(/\s+/g, "-");
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `trip-${safeName || "planner"}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error("Download PDF error:", err);
-  }
-};
-
-  const locations = useMemo(() => extractUniqueLocations(trip?.itinerary), [trip]);
-  const recommendedPlaces = useMemo(
-    () => extractRecommendedPlaces(trip?.itinerary),
-    [trip]
-  );
-
-  const examples = useMemo(() => locations.slice(0, 3).map((x) => x.location), [locations]);
-
-  const geoState = useGeoPoints(locations);
-  const mapPoints = geoState.data?.points ?? [];
-  const geoFailed = geoState.data?.failed ?? [];
-
-  const recommendedGeoState = useGeoPoints(recommendedPlaces);
-  const recommendedPoints = recommendedGeoState.data?.points ?? [];
-
-  const weatherState = useDestinationWeather(primaryDestination, mapPoints[0]);
-
-  const totalActivities = useMemo(() => {
-    return (trip?.itinerary?.days || []).reduce((sum, day) => sum + countDayActivities(day), 0);
-  }, [trip]);
-
-  const totalHours = useMemo(() => {
-    return (trip?.itinerary?.days || []).reduce((sum, day) => sum + getDayEstimatedHours(day), 0);
-  }, [trip]);
+  };
 
   if (tripState.loading) return <TripSkeleton />;
 
@@ -455,6 +498,8 @@ const downloadPDF = async () => {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
+      {downloadError ? <Alert type="error">{downloadError}</Alert> : null}
+
       <div ref={pdfRef} className="space-y-6">
         <Header
           trip={trip}
@@ -474,9 +519,14 @@ const downloadPDF = async () => {
           destinations={destinations}
           totalActivities={totalActivities}
           totalHours={totalHours}
+          mapPlaceCount={mapPlaceCount}
         />
 
-        <CityPlanSection summary={summary} tripMode={tripMode} destinations={destinations} />
+        <CityPlanSection
+          summary={summary}
+          tripMode={tripMode}
+          destinations={destinations}
+        />
 
         <WeatherSection
           state={weatherState}
@@ -491,6 +541,7 @@ const downloadPDF = async () => {
             days={trip.itinerary.days}
             openAll={openAllDays}
             collapseAll={collapseAllDays}
+            onJump={handleJumpToDay}
           />
         )}
 
@@ -600,7 +651,10 @@ const downloadPDF = async () => {
           ) : (
             <>
               <div className="relative z-0 overflow-hidden rounded-3xl border border-slate-200">
-                <TripRouteMap points={mapPoints} />
+                <TripRouteMap
+                  points={mapPoints}
+                  storageKey={`trip-route-points-${id}`}
+                />
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
@@ -612,7 +666,8 @@ const downloadPDF = async () => {
                   Total requested: <b>{locations.length}</b>
                   {geoFailed.length ? (
                     <>
-                      {" "}• Failed: <b>{geoFailed.length}</b>
+                      {" "}
+                      • Failed: <b>{geoFailed.length}</b>
                     </>
                   ) : null}
                 </div>
@@ -627,7 +682,16 @@ const downloadPDF = async () => {
   );
 }
 
-function Header({ trip, summary, tripMode, destinations, onBack, onNew, onEdit, onDownload }) {
+function Header({
+  trip,
+  summary,
+  tripMode,
+  destinations,
+  onBack,
+  onNew,
+  onEdit,
+  onDownload,
+}) {
   return (
     <Card className="relative z-50 isolate overflow-hidden">
       <div className="pointer-events-auto relative z-50 bg-gradient-to-r from-sky-700 via-blue-700 to-indigo-800 text-white">
@@ -732,9 +796,19 @@ function Header({ trip, summary, tripMode, destinations, onBack, onNew, onEdit, 
   );
 }
 
-function TripOverview({ trip, summary, tripMode, destinations, totalActivities, totalHours }) {
+function TripOverview({
+  trip,
+  summary,
+  tripMode,
+  destinations,
+  totalActivities,
+  totalHours,
+  mapPlaceCount,
+}) {
   const preferences = trip?.preferences || {};
-  const interests = Array.isArray(preferences?.interests) ? preferences.interests : [];
+  const interests = Array.isArray(preferences?.interests)
+    ? preferences.interests
+    : [];
 
   return (
     <Card className="overflow-hidden">
@@ -757,7 +831,7 @@ function TripOverview({ trip, summary, tripMode, destinations, totalActivities, 
           <InfoTile label="Activities" value={totalActivities || "0"} />
           <InfoTile label="Estimated Hours" value={formatHours(totalHours)} />
           <InfoTile label="Events" value={trip?.events?.length || "0"} />
-          <InfoTile label="Map Places" value={extractUniqueLocations(trip?.itinerary).length || "0"} />
+          <InfoTile label="Map Places" value={mapPlaceCount || "0"} />
         </div>
 
         {tripMode === "multi" && destinations.length > 1 ? (
@@ -801,7 +875,9 @@ function TripOverview({ trip, summary, tripMode, destinations, totalActivities, 
             <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
               Notes
             </div>
-            <div className="mt-2 text-sm leading-6 text-slate-700">{preferences.notes}</div>
+            <div className="mt-2 text-sm leading-6 text-slate-700">
+              {preferences.notes}
+            </div>
           </div>
         ) : null}
       </CardBody>
@@ -854,7 +930,7 @@ function CityPlanSection({ summary, tripMode, destinations }) {
   );
 }
 
-function DayNavigator({ days, openAll, collapseAll }) {
+function DayNavigator({ days, openAll, collapseAll, onJump }) {
   return (
     <Card className="overflow-hidden">
       <CardHeader
@@ -862,16 +938,39 @@ function DayNavigator({ days, openAll, collapseAll }) {
         subtitle="Quick navigation for longer itineraries"
         right={
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" className="px-3 py-2 text-xs" onClick={openAll}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="px-3 py-2 text-xs"
+              onClick={openAll}
+            >
               Expand all
             </Button>
-            <Button type="button" variant="ghost" className="px-3 py-2 text-xs" onClick={collapseAll}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="px-3 py-2 text-xs"
+              onClick={collapseAll}
+            >
               Collapse all
             </Button>
           </div>
         }
       />
-
+      <CardBody>
+        <div className="flex flex-wrap gap-2">
+          {days.map((day) => (
+            <button
+              key={day.day}
+              type="button"
+              onClick={() => onJump?.(day.day)}
+              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
+            >
+              Day {day.day}
+            </button>
+          ))}
+        </div>
+      </CardBody>
     </Card>
   );
 }
@@ -939,9 +1038,7 @@ function EventsSection({ events }) {
                   {(event.source || event.link) ? (
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       {event.source ? (
-                        <span className="text-xs text-slate-500">
-                          {event.source}
-                        </span>
+                        <span className="text-xs text-slate-500">{event.source}</span>
                       ) : null}
 
                       {event.link ? (
@@ -977,8 +1074,8 @@ function WeatherSection({ state, destination, tripMode }) {
         <CardBody>
           <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
             <div className="h-36 animate-pulse rounded-3xl bg-slate-100" />
-            <div className="grid grid-cols-3 gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
               ))}
             </div>
@@ -996,12 +1093,12 @@ function WeatherSection({ state, destination, tripMode }) {
   const daily = state.data.daily || {};
   const days = Array.isArray(daily?.time)
     ? daily.time.map((date, i) => ({
-        date,
-        weatherCode: daily?.weather_code?.[i],
-        max: daily?.temperature_2m_max?.[i],
-        min: daily?.temperature_2m_min?.[i],
-        rainChance: daily?.precipitation_probability_max?.[i],
-      }))
+      date,
+      weatherCode: daily?.weather_code?.[i],
+      max: daily?.temperature_2m_max?.[i],
+      min: daily?.temperature_2m_min?.[i],
+      rainChance: daily?.precipitation_probability_max?.[i],
+    }))
     : [];
 
   return (
@@ -1013,20 +1110,14 @@ function WeatherSection({ state, destination, tripMode }) {
             ? `Current forecast for your first city: ${state.data?.name || destination || "destination"}`
             : `Current forecast for ${state.data?.name || destination || "your destination"}`
         }
-        right={
-          <Badge className="border-sky-200 bg-sky-50 text-sky-700">
-            Live weather
-          </Badge>
-        }
+        right={<Badge className="border-sky-200 bg-sky-50 text-sky-700">Live weather</Badge>}
       />
       <CardBody className="space-y-4">
         <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
           <div className="rounded-[1.75rem] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-5">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-sm font-semibold text-slate-500">
-                  Right now
-                </div>
+                <div className="text-sm font-semibold text-slate-500">Right now</div>
                 <div className="mt-2 flex items-center gap-3">
                   <div className="text-4xl">{weatherCodeToEmoji(current.weather_code)}</div>
                   <div>
@@ -1097,12 +1188,12 @@ function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
     enrichedPlaces.length > 0
       ? enrichedPlaces
       : places.map((p, index) => ({
-          id: `${p?.name || "place"}-${index}`,
-          name: p?.name || "Recommended Place",
-          reason: p?.reason || "",
-          category: p?.category || "",
-          location: p?.location || "",
-        }));
+        id: `${p?.name || "place"}-${index}`,
+        name: p?.name || "Recommended Place",
+        reason: p?.reason || "",
+        category: p?.category || "",
+        location: p?.location || "",
+      }));
 
   return (
     <Card className="overflow-hidden">
@@ -1117,7 +1208,10 @@ function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
         {loading ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+              <div
+                key={i}
+                className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white"
+              >
                 <div className="h-44 animate-pulse bg-slate-100" />
                 <div className="space-y-3 p-4">
                   <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
@@ -1186,15 +1280,10 @@ function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
                     <div className="text-xs leading-5 text-slate-500">{place.address}</div>
                   ) : null}
 
-                  {place.wikipedia ? (
-                    <a
-                      href={place.wikipedia}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex text-xs font-semibold text-sky-700 hover:text-sky-800"
-                    >
-                      Learn more
-                    </a>
+                  {place.photoAttribution?.photographer ? (
+                    <div className="text-[11px] text-slate-400">
+                      Photo by {place.photoAttribution.photographer}
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -1280,15 +1369,10 @@ function PlacesGallery({ points }) {
                   <div className="text-xs leading-5 text-slate-500">{place.address}</div>
                 ) : null}
 
-                {place.wikipedia ? (
-                  <a
-                    href={place.wikipedia}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex text-xs font-semibold text-sky-700 hover:text-sky-800"
-                  >
-                    Learn more
-                  </a>
+                {place.photoAttribution?.photographer ? (
+                  <div className="text-[11px] text-slate-400">
+                    Photo by {place.photoAttribution.photographer}
+                  </div>
                 ) : null}
               </div>
             </div>

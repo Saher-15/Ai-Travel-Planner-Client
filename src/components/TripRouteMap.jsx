@@ -17,6 +17,7 @@ L.Icon.Default.mergeOptions({
 
 const DEFAULT_CENTER = [31.7683, 35.2137];
 const DEFAULT_ZOOM = 13;
+const BLOCK_ORDER = { morning: 1, afternoon: 2, evening: 3 };
 
 function isValidPoint(p) {
   return (
@@ -26,6 +27,55 @@ function isValidPoint(p) {
     Math.abs(Number(p.lat)) <= 90 &&
     Math.abs(Number(p.lon)) <= 180
   );
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function roundCoord(value, digits = 5) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Number(n.toFixed(digits));
+}
+
+function pointSort(a, b) {
+  return (
+    (Number(a?.day) || 0) - (Number(b?.day) || 0) ||
+    (BLOCK_ORDER[a?.timeBlock] ?? 99) - (BLOCK_ORDER[b?.timeBlock] ?? 99) ||
+    normalizeText(a?.title).localeCompare(normalizeText(b?.title)) ||
+    normalizeText(a?.location).localeCompare(normalizeText(b?.location))
+  );
+}
+
+function getRelevantPoints(points) {
+  const valid = (points ?? []).filter(isValidPoint).sort(pointSort);
+
+  const unique = [];
+  const seen = new Set();
+
+  for (const p of valid) {
+    const lat = roundCoord(p.lat);
+    const lon = roundCoord(p.lon);
+    const locationKey = normalizeText(
+      p?.displayName || p?.location || p?.title || p?.name
+    );
+
+    const key = `${lat}|${lon}|${locationKey}`;
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+
+    unique.push({
+      ...p,
+      lat: Number(p.lat),
+      lon: Number(p.lon),
+      roundedLat: lat,
+      roundedLon: lon,
+    });
+  }
+
+  return unique;
 }
 
 function getPopupLabel(point) {
@@ -41,6 +91,15 @@ function getMarkerVariant(index, total) {
   if (index === 0) return "start";
   if (index === total - 1) return "end";
   return "middle";
+}
+
+function getMarkerTitle(index, total) {
+  const variant = getMarkerVariant(index, total);
+
+  if (variant === "single") return "Single stop";
+  if (variant === "start") return "Start";
+  if (variant === "end") return "End";
+  return `Stop ${index + 1}`;
 }
 
 function createNumberedIcon(index, total) {
@@ -75,8 +134,8 @@ function createNumberedIcon(index, total) {
     className: "custom-numbered-marker",
     html: `
       <div style="
-        width: 36px;
-        height: 36px;
+        width: 38px;
+        height: 38px;
         border-radius: 9999px;
         background: ${style.bg};
         color: white;
@@ -91,9 +150,9 @@ function createNumberedIcon(index, total) {
         ${style.label}
       </div>
     `,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -18],
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+    popupAnchor: [0, -20],
   });
 }
 
@@ -187,7 +246,10 @@ function FitBounds({ points }) {
     const latLngs = valid.map((p) => [Number(p.lat), Number(p.lon)]);
     const bounds = L.latLngBounds(latLngs);
 
-    map.fitBounds(bounds, { padding: [40, 40] });
+    map.fitBounds(bounds, {
+      padding: [45, 45],
+      maxZoom: 14,
+    });
   }, [map, valid]);
 
   return null;
@@ -197,7 +259,7 @@ function RouteLegend({ total }) {
   if (!total) return null;
 
   return (
-    <div className="pointer-events-none absolute left-3 top-3 z-500 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur">
+    <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur">
       <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
         Route guide
       </div>
@@ -224,10 +286,35 @@ function RouteLegend({ total }) {
   );
 }
 
-export default function TripRouteMap({ points }) {
-  const validPoints = useMemo(() => {
-    return (points ?? []).filter(isValidPoint);
-  }, [points]);
+function saveRelevantPoints(storageKey, points) {
+  if (!storageKey || typeof window === "undefined") return;
+
+  try {
+    const payload = points.map((p, index) => ({
+      order: index + 1,
+      title: p?.title || p?.name || null,
+      label: getPopupLabel(p),
+      location: p?.location || null,
+      displayName: p?.displayName || null,
+      day: p?.day ?? null,
+      date: p?.date ?? null,
+      timeBlock: p?.timeBlock ?? null,
+      category: p?.category ?? null,
+      type: p?.type ?? null,
+      lat: roundCoord(p?.lat, 6),
+      lon: roundCoord(p?.lon, 6),
+    }));
+
+    window.localStorage.setItem(storageKey, JSON.stringify(payload));
+  } catch {}
+}
+
+export default function TripRouteMap({
+  points,
+  storageKey = "trip-relevant-route-points",
+  onResolvedPoints,
+}) {
+  const validPoints = useMemo(() => getRelevantPoints(points), [points]);
 
   const initialCenter = useMemo(() => {
     if (validPoints.length) {
@@ -236,8 +323,19 @@ export default function TripRouteMap({ points }) {
     return DEFAULT_CENTER;
   }, [validPoints]);
 
+  useEffect(() => {
+    saveRelevantPoints(storageKey, validPoints);
+
+    if (typeof onResolvedPoints === "function") {
+      onResolvedPoints(validPoints);
+    }
+  }, [storageKey, validPoints, onResolvedPoints]);
+
   return (
-    <div className="trip-route-map relative" style={{ height: 420, width: "100%" }}>
+    <div
+      className="trip-route-map relative overflow-hidden rounded-3xl"
+      style={{ height: 420, width: "100%" }}
+    >
       <RouteLegend total={validPoints.length} />
 
       <MapContainer
@@ -248,7 +346,7 @@ export default function TripRouteMap({ points }) {
       >
         <TileLayer
           attribution="&copy; OpenStreetMap contributors &copy; CARTO"
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
 
         <FitBounds points={validPoints} />
@@ -259,12 +357,12 @@ export default function TripRouteMap({ points }) {
 
           return (
             <Marker
-              key={`${p.location || p.title || p.name || "p"}-${p.day}-${p.timeBlock}-${idx}`}
+              key={`${roundCoord(p.lat, 6)}-${roundCoord(p.lon, 6)}-${p.location || p.title || p.name || "p"}-${p.day || "d"}-${p.timeBlock || "b"}-${idx}`}
               position={[Number(p.lat), Number(p.lon)]}
               icon={createNumberedIcon(idx, validPoints.length)}
             >
               <Popup>
-                <div style={{ maxWidth: 260 }}>
+                <div style={{ maxWidth: 280 }}>
                   <div
                     style={{
                       display: "inline-block",
@@ -287,13 +385,7 @@ export default function TripRouteMap({ points }) {
                           : "#075985",
                     }}
                   >
-                    {variant === "single"
-                      ? "Single stop"
-                      : variant === "start"
-                      ? "Start"
-                      : variant === "end"
-                      ? "End"
-                      : `Stop ${idx + 1}`}
+                    {getMarkerTitle(idx, validPoints.length)}
                   </div>
 
                   <div
@@ -329,6 +421,12 @@ export default function TripRouteMap({ points }) {
                       {p.day ? `Day ${p.day}` : ""}
                       {p.day && p.timeBlock ? " • " : ""}
                       {p.timeBlock || ""}
+                    </div>
+                  ) : null}
+
+                  {p.address ? (
+                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                      {p.address}
                     </div>
                   ) : null}
 
@@ -372,6 +470,17 @@ export default function TripRouteMap({ points }) {
                       ) : null}
                     </div>
                   ) : null}
+
+                  <div
+                    style={{
+                      marginTop: 8,
+                      fontSize: 11,
+                      color: "#64748b",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {`Lat: ${roundCoord(p.lat, 5)} • Lon: ${roundCoord(p.lon, 5)}`}
+                  </div>
 
                   {p.photoUrl ? (
                     <img
