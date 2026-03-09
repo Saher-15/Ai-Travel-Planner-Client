@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import Layout from "./components/Layout.jsx";
 
 import Home from "./pages/Home.jsx";
@@ -25,36 +26,53 @@ import "leaflet/dist/leaflet.css";
 
 const P = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>;
 
+function AppRoutes() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (window.gtag) {
+      window.gtag("event", "page_view", {
+        page_path: location.pathname,
+        page_title: document.title,
+      });
+    }
+  }, [location.pathname]);
+
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/verify/:token" element={<VerifyEmail />} />
+
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/profile" element={<Profile />} />
+
+        <Route path="/create" element={<P><CreateTrip /></P>} />
+        <Route path="/result" element={<P><TripResult /></P>} />
+        <Route path="/trips" element={<P><MyTrips /></P>} />
+        <Route path="/trip/:id" element={<P><ViewTrip /></P>} />
+        <Route path="/trip/:id/edit" element={<P><EditTrip /></P>} />
+
+        <Route path="/admin/contacts" element={<P><AdminContacts /></P>} />
+
+        <Route
+          path="*"
+          element={<div className="text-sm text-slate-600">Not found</div>}
+        />
+      </Routes>
+    </Layout>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/verify/:token" element={<VerifyEmail />} />
-
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/profile" element={<Profile />} />
-
-          <Route path="/create" element={<P><CreateTrip /></P>} />
-          <Route path="/result" element={<P><TripResult /></P>} />
-          <Route path="/trips" element={<P><MyTrips /></P>} />
-          <Route path="/trip/:id" element={<P><ViewTrip /></P>} />
-          <Route path="/trip/:id/edit" element={<P><EditTrip /></P>} />
-
-          <Route path="/admin/contacts" element={<P><AdminContacts /></P>} />
-
-          <Route
-            path="*"
-            element={<div className="text-sm text-slate-600">Not found</div>}
-          />
-        </Routes>
-      </Layout>
+      <AppRoutes />
     </BrowserRouter>
   );
 }
