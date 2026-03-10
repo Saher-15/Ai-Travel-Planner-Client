@@ -7,7 +7,6 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 
 import CreateTrip from "./pages/CreateTrip.jsx";
-import TripResult from "./pages/TripResult.jsx";
 import MyTrips from "./pages/MyTrips.jsx";
 import ViewTrip from "./pages/ViewTrip.jsx";
 import EditTrip from "./pages/EditTrip.jsx";
@@ -59,7 +58,6 @@ function AppRoutes() {
         <Route path="/terms" element={<Terms />} />
 
         <Route path="/create" element={<P><CreateTrip /></P>} />
-        <Route path="/result" element={<P><TripResult /></P>} />
         <Route path="/trips" element={<P><MyTrips /></P>} />
         <Route path="/trip/:id" element={<P><ViewTrip /></P>} />
         <Route path="/trip/:id/edit" element={<P><EditTrip /></P>} />

@@ -65,14 +65,14 @@ function extractUniqueLocations(itinerary) {
 function extractRecommendedPlaces(itinerary) {
   const rows = Array.isArray(itinerary?.recommendedPlaces)
     ? itinerary.recommendedPlaces
-        .map((p, index) => ({
-          id: `${p?.name || "place"}-${index}`,
-          name: (p?.name || "Recommended Place").trim(),
-          reason: (p?.reason || "").trim(),
-          category: (p?.category || "").trim(),
-          location: (p?.location || "").trim(),
-        }))
-        .filter((p) => p.location)
+      .map((p, index) => ({
+        id: `${p?.name || "place"}-${index}`,
+        name: (p?.name || "Recommended Place").trim(),
+        reason: (p?.reason || "").trim(),
+        category: (p?.category || "").trim(),
+        location: (p?.location || "").trim(),
+      }))
+      .filter((p) => p.location)
     : [];
 
   return Array.from(
@@ -105,27 +105,6 @@ function formatHours(value) {
   if (!Number.isFinite(value) || value <= 0) return "—";
   if (Number.isInteger(value)) return `${value}h`;
   return `${value.toFixed(1)}h`;
-}
-
-function roundSafe(value, digits = 2) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "—";
-  return n.toFixed(digits);
-}
-
-function getPlacePointKey(point) {
-  const norm = (v) => String(v || "").trim().toLowerCase();
-  const lat = Number(point?.lat);
-  const lon = Number(point?.lon);
-
-  return [
-    norm(point?.title || point?.name || ""),
-    norm(point?.location || point?.displayName || ""),
-    Number(point?.day || 0),
-    norm(point?.timeBlock || ""),
-    Number.isFinite(lat) ? lat.toFixed(6) : "",
-    Number.isFinite(lon) ? lon.toFixed(6) : "",
-  ].join("|");
 }
 
 function useAsync(fn, deps) {
@@ -170,111 +149,9 @@ function useGeoPoints(locations) {
   return useAsync(async () => {
     if (!stableLocations.length) return { points: [], failed: [] };
 
-    const normalize = (s) =>
-      String(s || "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^\w\s]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    const getWords = (s) => [...new Set(normalize(s).split(" ").filter(Boolean))];
-
-    const includesText = (text, value) => normalize(text).includes(normalize(value));
-
-    const queryWordsMatch = (query, displayName) => {
-      const qWords = getWords(query);
-      const haystack = normalize(displayName);
-
-      if (!qWords.length || !haystack) return false;
-
-      const matched = qWords.filter((w) => haystack.includes(w)).length;
-      return matched >= Math.max(2, Math.ceil(qWords.length * 0.6));
-    };
-
-    const extractCityCountryHints = (query) => {
-      const parts = String(query || "")
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
-
-      return {
-        city: parts.length >= 2 ? parts[parts.length - 2] : "",
-        country: parts.length >= 1 ? parts[parts.length - 1] : "",
-      };
-    };
-
-    const looksWrongPlace = (query, hit) => {
-      if (!hit) return true;
-
-      const displayName = hit?.display_name || "";
-      const qNorm = normalize(query);
-      const displayNorm = normalize(displayName);
-
-      if (!displayNorm) return true;
-
-      const { city, country } = extractCityCountryHints(query);
-
-      if (city && !includesText(displayName, city)) return true;
-      if (country && !includesText(displayName, country)) return true;
-
-      if (!queryWordsMatch(query, displayName)) return true;
-
-      if (qNorm.includes("paris") && !includesText(displayName, "paris")) return true;
-      if (qNorm.includes("london") && !includesText(displayName, "london")) return true;
-      if (qNorm.includes("rome") && !includesText(displayName, "rome")) return true;
-      if (qNorm.includes("dubai") && !includesText(displayName, "dubai")) return true;
-      if (qNorm.includes("new york") && !includesText(displayName, "new york")) return true;
-
-      return false;
-    };
-
-    const buildRetryQueries = (query, point) => {
-      const raw = String(query || "").trim();
-      const title = String(point?.title || point?.name || "").trim();
-
-      const parts = raw
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
-
-      const city = parts.length >= 2 ? parts[parts.length - 2] : "";
-      const country = parts.length >= 1 ? parts[parts.length - 1] : "";
-
-      const retries = [
-        raw,
-        title && city && country ? `${title}, ${city}, ${country}` : "",
-        title && city ? `${title}, ${city}` : "",
-        raw.replace(/\s*→\s*/g, ", "),
-      ].filter(Boolean);
-
-      return [...new Set(retries)];
-    };
-
-    async function retrySingleQueries(queriesToTry) {
-      for (const forcedQuery of queriesToTry) {
-        try {
-          const { data } = await api.post("/geocode/batch", {
-            queries: [forcedQuery],
-          });
-
-          const r = Array.isArray(data?.results) ? data.results[0] : null;
-          const lat = Number(r?.lat);
-          const lon = Number(r?.lon);
-
-          if (
-            Number.isFinite(lat) &&
-            Number.isFinite(lon) &&
-            !looksWrongPlace(forcedQuery, r)
-          ) {
-            return r;
-          }
-        } catch {}
-      }
-
-      return null;
-    }
+    const normalize = (s) => String(s || "").trim().toLowerCase();
+    const includesCity = (text, city) =>
+      normalize(text).includes(normalize(city));
 
     const queries = stableLocations.map((p) => p.location);
     const { data: geo } = await api.post("/geocode/batch", { queries });
@@ -285,8 +162,18 @@ function useGeoPoints(locations) {
     const points = [];
     const failed = [];
 
+    async function retrySingle(forcedQuery) {
+      const { data } = await api.post("/geocode/batch", {
+        queries: [forcedQuery],
+      });
+      const r = Array.isArray(data?.results) ? data.results[0] : null;
+      return r && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lon))
+        ? r
+        : null;
+    }
+
     for (const p of stableLocations) {
-      const q = String(p.location || "").trim();
+      const q = p.location.trim();
       const qNorm = normalize(q);
 
       let hit = byQuery.get(qNorm) || null;
@@ -294,13 +181,16 @@ function useGeoPoints(locations) {
       const hitLat = Number(hit?.lat);
       const hitLon = Number(hit?.lon);
 
-      const invalidHit =
-        !Number.isFinite(hitLat) ||
-        !Number.isFinite(hitLon) ||
-        looksWrongPlace(q, hit);
+      const wantsParis = qNorm.includes("paris");
+      const hitName = hit?.display_name || "";
+      const looksWrongCity = wantsParis && hit && !includesCity(hitName, "paris");
 
-      if (invalidHit) {
-        const retried = await retrySingleQueries(buildRetryQueries(q, p));
+      if (!Number.isFinite(hitLat) || !Number.isFinite(hitLon) || looksWrongCity) {
+        const forced = wantsParis
+          ? `${q.replace(/,?\s*paris.*$/i, "")}, Paris, Île-de-France, France`
+          : q;
+
+        const retried = await retrySingle(forced);
 
         if (retried) {
           hit = retried;
@@ -309,9 +199,9 @@ function useGeoPoints(locations) {
             q,
             reason: !hit
               ? "No match returned"
-              : !Number.isFinite(hitLat) || !Number.isFinite(hitLon)
-              ? "No lat/lon returned"
-              : `Weak or suspicious match: ${hit?.display_name || "unknown result"}`,
+              : looksWrongCity
+                ? "Matched wrong city (retry failed)"
+                : "No lat/lon returned",
           });
           continue;
         }
@@ -334,10 +224,6 @@ function useGeoPoints(locations) {
           type: detail?.type ?? null,
           address: detail?.address ?? null,
           photoUrl: detail?.photoUrl ?? null,
-          photoThumbUrl: detail?.photoThumbUrl ?? null,
-          photoAlt: detail?.photoAlt ?? null,
-          photoBlurHash: detail?.photoBlurHash ?? null,
-          photoColor: detail?.photoColor ?? null,
           photoAttribution: detail?.photoAttribution ?? null,
         });
       } catch {
@@ -466,158 +352,10 @@ function scrollToDay(dayNumber) {
   el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function PhotoPlaceholder({ label = "No photo available", compact = false }) {
-  return (
-    <div
-      className={`flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 ${
-        compact ? "min-h-[180px]" : "min-h-[220px]"
-      }`}
-    >
-      <div className="flex flex-col items-center gap-3 text-slate-400">
-        <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/80 shadow-sm">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-7 w-7"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-9-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-        </div>
-        <div className="text-xs font-semibold">{label}</div>
-      </div>
-    </div>
-  );
-}
-
-function PhotoAttribution({ attribution }) {
-  if (!attribution?.photographer) return null;
-
-  return (
-    <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">
-      <span className="truncate">Photo by {attribution.photographer}</span>
-      {attribution?.photographerUrl ? (
-        <a
-          href={attribution.photographerUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="shrink-0 font-semibold text-sky-600 transition hover:text-sky-700"
-        >
-          Credit
-        </a>
-      ) : null}
-    </div>
-  );
-}
-
-function TravelPhotoCard({
-  image,
-  alt,
-  badge,
-  title,
-  subtitle,
-  description,
-  chips = [],
-  address,
-  attribution,
-  footer,
-  imageHeight = "h-56",
-  active = false,
-}) {
-  return (
-    <div
-      className={`group overflow-hidden rounded-[1.6rem] border bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/70 ${
-        active ? "border-sky-300 ring-4 ring-sky-100" : "border-slate-200/90"
-      }`}
-    >
-      <div className={`relative overflow-hidden bg-slate-100 ${imageHeight}`}>
-        {image ? (
-          <>
-            <img
-              src={image}
-              alt={alt}
-              className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/55 via-slate-900/10 to-transparent" />
-          </>
-        ) : (
-          <PhotoPlaceholder compact />
-        )}
-
-        {badge ? (
-          <div className="absolute left-3 top-3 rounded-full border border-white/20 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-            {badge}
-          </div>
-        ) : null}
-
-        {active ? (
-          <div className="absolute right-3 top-3 rounded-full bg-sky-500 px-3 py-1 text-[11px] font-bold text-white shadow-lg">
-            Selected
-          </div>
-        ) : null}
-      </div>
-
-      <div className="space-y-4 p-4 sm:p-5">
-        <div>
-          <div className="line-clamp-2 text-base font-black tracking-tight text-slate-900">
-            {title}
-          </div>
-          {subtitle ? (
-            <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
-              {subtitle}
-            </div>
-          ) : null}
-        </div>
-
-        {description ? (
-          <div className="line-clamp-4 text-sm leading-6 text-slate-600">
-            {description}
-          </div>
-        ) : null}
-
-        {!!chips.length && (
-          <div className="flex flex-wrap gap-2">
-            {chips.filter(Boolean).map((chip, index) => (
-              <span
-                key={`${chip}-${index}`}
-                className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                  active
-                    ? "border-sky-200 bg-sky-50 text-sky-700"
-                    : "border-slate-200 bg-slate-50 text-slate-700"
-                }`}
-              >
-                {chip}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {address ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
-            {address}
-          </div>
-        ) : null}
-
-        {footer ? <div>{footer}</div> : null}
-
-        <PhotoAttribution attribution={attribution} />
-      </div>
-    </div>
-  );
-}
-
 export default function ViewTrip() {
-  useEffect(() => {
+    useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
-
   const nav = useNavigate();
   const { id } = useParams();
 
@@ -631,8 +369,6 @@ export default function ViewTrip() {
   const pdfRef = useRef(null);
   const [openDays, setOpenDays] = useState({});
   const [downloadError, setDownloadError] = useState("");
-  const [activePointKey, setActivePointKey] = useState("");
-  const [selectedDay, setSelectedDay] = useState("all");
 
   useEffect(() => {
     if (!trip?.itinerary?.days?.length) return;
@@ -651,30 +387,13 @@ export default function ViewTrip() {
   const examples = useMemo(() => locations.slice(0, 3).map((x) => x.location), [locations]);
 
   const geoState = useGeoPoints(locations);
-  const allMapPoints = geoState.data?.points ?? [];
+  const mapPoints = geoState.data?.points ?? [];
   const geoFailed = geoState.data?.failed ?? [];
 
   const recommendedGeoState = useGeoPoints(recommendedPlaces);
   const recommendedPoints = recommendedGeoState.data?.points ?? [];
 
-  const weatherState = useDestinationWeather(primaryDestination, allMapPoints[0]);
-
-  const mapPoints = useMemo(() => {
-    if (selectedDay === "all") return allMapPoints;
-    return allMapPoints.filter((p) => Number(p?.day) === Number(selectedDay));
-  }, [allMapPoints, selectedDay]);
-
-  useEffect(() => {
-    if (!mapPoints.length) {
-      setActivePointKey("");
-      return;
-    }
-
-    const stillExists = mapPoints.some((p) => getPlacePointKey(p) === activePointKey);
-    if (!activePointKey || !stillExists) {
-      setActivePointKey(getPlacePointKey(mapPoints[0]));
-    }
-  }, [mapPoints, activePointKey]);
+  const weatherState = useDestinationWeather(primaryDestination, mapPoints[0]);
 
   const totalActivities = useMemo(() => {
     return (trip?.itinerary?.days || []).reduce(
@@ -720,7 +439,6 @@ export default function ViewTrip() {
       ...prev,
       [dayNumber]: true,
     }));
-    setSelectedDay(dayNumber);
 
     requestAnimationFrame(() => {
       scrollToDay(dayNumber);
@@ -824,8 +542,6 @@ export default function ViewTrip() {
         {!!trip?.itinerary?.days?.length && (
           <DayNavigator
             days={trip.itinerary.days}
-            selectedDay={selectedDay}
-            setSelectedDay={setSelectedDay}
             openAll={openAllDays}
             collapseAll={collapseAllDays}
             onJump={handleJumpToDay}
@@ -878,40 +594,9 @@ export default function ViewTrip() {
         <CardHeader
           title="Destination Map"
           subtitle={
-            selectedDay === "all"
-              ? tripMode === "multi"
-                ? "Places and route across your multi-city itinerary"
-                : "Places and route from your itinerary"
-              : `Showing places for Day ${selectedDay}`
-          }
-          right={
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedDay("all")}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  selectedDay === "all"
-                    ? "bg-sky-600 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                All days
-              </button>
-              {(trip?.itinerary?.days || []).map((day) => (
-                <button
-                  key={day.day}
-                  type="button"
-                  onClick={() => setSelectedDay(day.day)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    Number(selectedDay) === Number(day.day)
-                      ? "bg-sky-600 text-white"
-                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-                >
-                  Day {day.day}
-                </button>
-              ))}
-            </div>
+            tripMode === "multi"
+              ? "Places and route across your multi-city itinerary"
+              : "Places and route from your itinerary"
           }
         />
 
@@ -932,50 +617,34 @@ export default function ViewTrip() {
             />
           ) : mapPoints.length === 0 ? (
             <NiceEmptyState
-              title={
-                selectedDay === "all"
-                  ? "We couldn’t geocode your locations"
-                  : `No mapped places found for Day ${selectedDay}`
-              }
+              title="We couldn’t geocode your locations"
               subtitle={
-                selectedDay === "all" ? (
-                  <>
-                    Found <b>{locations.length}</b> location strings, but got <b>0</b>{" "}
-                    coordinates back.
-                  </>
-                ) : (
-                  "This day does not currently have mapped coordinates."
-                )
+                <>
+                  Found <b>{locations.length}</b> location strings, but got <b>0</b>{" "}
+                  coordinates back.
+                </>
               }
               hint={
-                selectedDay === "all" ? (
-                  <div className="space-y-2">
-                    <div className="break-words text-xs text-slate-500">
-                      Example queries: {examples.join(" | ")}
-                    </div>
-                    {geoFailed.length ? (
-                      <div className="break-words text-xs text-slate-500">
-                        Failed examples:{" "}
-                        {geoFailed
-                          .slice(0, 3)
-                          .map((x) => `${x.q} (${x.reason})`)
-                          .join(" | ")}
-                      </div>
-                    ) : null}
+                <div className="space-y-2">
+                  <div className="break-words text-xs text-slate-500">
+                    Example queries: {examples.join(" | ")}
                   </div>
-                ) : null
+                  {geoFailed.length ? (
+                    <div className="break-words text-xs text-slate-500">
+                      Failed examples:{" "}
+                      {geoFailed
+                        .slice(0, 3)
+                        .map((x) => `${x.q} (${x.reason})`)
+                        .join(" | ")}
+                    </div>
+                  ) : null}
+                </div>
               }
               action={
                 <div className="flex flex-wrap gap-2">
-                  {selectedDay !== "all" ? (
-                    <Button onClick={() => setSelectedDay("all")} variant="secondary">
-                      Show all days
-                    </Button>
-                  ) : (
-                    <Button onClick={() => window.location.reload()} variant="secondary">
-                      Retry
-                    </Button>
-                  )}
+                  <Button onClick={() => window.location.reload()} variant="secondary">
+                    Retry
+                  </Button>
                   <Button onClick={() => nav("/create")} variant="ghost">
                     Create New
                   </Button>
@@ -988,18 +657,13 @@ export default function ViewTrip() {
                 <TripRouteMap
                   points={mapPoints}
                   storageKey={`trip-route-points-${id}`}
-                  activePointKey={activePointKey}
-                  onMarkerSelect={(point) => {
-                    setActivePointKey(getPlacePointKey(point));
-                  }}
                 />
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                 <div>
                   Showing <b>{mapPoints.length}</b> pinned places
-                  {mapPoints.length > 1 ? " with route" : ""}
-                  {selectedDay !== "all" ? ` for Day ${selectedDay}` : ""}.
+                  {mapPoints.length > 1 ? " with route" : ""}.
                 </div>
                 <div>
                   Total requested: <b>{locations.length}</b>
@@ -1016,15 +680,7 @@ export default function ViewTrip() {
         </CardBody>
       </Card>
 
-      {mapPoints.length > 0 && (
-        <PlacesGallery
-          points={mapPoints}
-          activePointKey={activePointKey}
-          onSelectPoint={(point) => {
-            setActivePointKey(getPlacePointKey(point));
-          }}
-        />
-      )}
+      {mapPoints.length > 0 && <PlacesGallery points={mapPoints} />}
     </div>
   );
 }
@@ -1277,7 +933,7 @@ function CityPlanSection({ summary, tripMode, destinations }) {
   );
 }
 
-function DayNavigator({ days, selectedDay, setSelectedDay, openAll, collapseAll, onJump }) {
+function DayNavigator({ days, openAll, collapseAll, onJump }) {
   return (
     <Card className="overflow-hidden">
       <CardHeader
@@ -1304,40 +960,18 @@ function DayNavigator({ days, selectedDay, setSelectedDay, openAll, collapseAll,
           </div>
         }
       />
-      <CardBody className="space-y-3">
+      <CardBody>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedDay("all")}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-              selectedDay === "all"
-                ? "bg-sky-600 text-white"
-                : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
-            }`}
-          >
-            All days
-          </button>
-
           {days.map((day) => (
             <button
               key={day.day}
               type="button"
               onClick={() => onJump?.(day.day)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                Number(selectedDay) === Number(day.day)
-                  ? "bg-sky-600 text-white"
-                  : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
-              }`}
+              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
             >
               Day {day.day}
             </button>
           ))}
-        </div>
-
-        <div className="text-xs text-slate-500">
-          {selectedDay === "all"
-            ? "Map and gallery are showing all days."
-            : `Map and gallery are filtered to Day ${selectedDay}.`}
         </div>
       </CardBody>
     </Card>
@@ -1462,12 +1096,12 @@ function WeatherSection({ state, destination, tripMode }) {
   const daily = state.data.daily || {};
   const days = Array.isArray(daily?.time)
     ? daily.time.map((date, i) => ({
-        date,
-        weatherCode: daily?.weather_code?.[i],
-        max: daily?.temperature_2m_max?.[i],
-        min: daily?.temperature_2m_min?.[i],
-        rainChance: daily?.precipitation_probability_max?.[i],
-      }))
+      date,
+      weatherCode: daily?.weather_code?.[i],
+      max: daily?.temperature_2m_max?.[i],
+      min: daily?.temperature_2m_min?.[i],
+      rainChance: daily?.precipitation_probability_max?.[i],
+    }))
     : [];
 
   return (
@@ -1557,12 +1191,12 @@ function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
     enrichedPlaces.length > 0
       ? enrichedPlaces
       : places.map((p, index) => ({
-          id: `${p?.name || "place"}-${index}`,
-          name: p?.name || "Recommended Place",
-          reason: p?.reason || "",
-          category: p?.category || "",
-          location: p?.location || "",
-        }));
+        id: `${p?.name || "place"}-${index}`,
+        name: p?.name || "Recommended Place",
+        reason: p?.reason || "",
+        category: p?.category || "",
+        location: p?.location || "",
+      }));
 
   return (
     <Card className="overflow-hidden">
@@ -1575,41 +1209,87 @@ function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
         {error ? <Alert type="error">{error}</Alert> : null}
 
         {loading ? (
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white"
+                className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white"
               >
-                <div className="h-56 animate-pulse bg-slate-100" />
-                <div className="space-y-3 p-5">
-                  <div className="h-5 w-2/3 animate-pulse rounded bg-slate-200" />
+                <div className="h-44 animate-pulse bg-slate-100" />
+                <div className="space-y-3 p-4">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
                   <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
                   <div className="h-3 w-4/5 animate-pulse rounded bg-slate-100" />
-                  <div className="flex gap-2">
-                    <div className="h-7 w-20 animate-pulse rounded-full bg-slate-100" />
-                    <div className="h-7 w-16 animate-pulse rounded-full bg-slate-100" />
-                  </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {displayedPlaces.map((place, i) => (
-              <TravelPhotoCard
+              <div
                 key={place.id || `${place.location}-${i}`}
-                image={place.photoUrl}
-                alt={place.photoAlt || place.name || place.location}
-                badge={place.category || "Recommended"}
-                title={place.name || place.title || place.location}
-                subtitle={place.displayName || place.location}
-                description={place.reason}
-                chips={[place.type || "", place.category || ""]}
-                address={place.address}
-                attribution={place.photoAttribution}
-                imageHeight="h-56"
-              />
+                className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md"
+              >
+                <div className="relative h-44 overflow-hidden bg-slate-100">
+                  {place.photoUrl ? (
+                    <img
+                      src={place.photoUrl}
+                      alt={place.name || place.location}
+                      className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                      No photo available
+                    </div>
+                  )}
+
+                  {place.category ? (
+                    <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white">
+                      {place.category}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-3 p-4">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">
+                      {place.name || place.title || place.location}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {place.displayName || place.location}
+                    </div>
+                  </div>
+
+                  {place.reason ? (
+                    <div className="text-sm leading-6 text-slate-600">{place.reason}</div>
+                  ) : null}
+
+                  <div className="flex flex-wrap gap-2">
+                    {place.type ? (
+                      <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+                        {place.type}
+                      </span>
+                    ) : null}
+                    {place.category ? (
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                        {place.category}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {place.address ? (
+                    <div className="text-xs leading-5 text-slate-500">{place.address}</div>
+                  ) : null}
+
+                  {place.photoAttribution?.photographer ? (
+                    <div className="text-[11px] text-slate-400">
+                      Photo by {place.photoAttribution.photographer}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -1618,7 +1298,7 @@ function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
   );
 }
 
-function PlacesGallery({ points, activePointKey, onSelectPoint }) {
+function PlacesGallery({ points }) {
   return (
     <Card className="overflow-hidden">
       <CardHeader
@@ -1627,47 +1307,79 @@ function PlacesGallery({ points, activePointKey, onSelectPoint }) {
         right={<Badge>{points.length} places</Badge>}
       />
       <CardBody>
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {points.map((place, i) => {
-            const pointKey = getPlacePointKey(place);
-            const isActive = activePointKey === pointKey;
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {points.map((place, i) => (
+            <div
+              key={`${place.location}-${i}`}
+              className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md"
+            >
+              <div className="relative h-44 overflow-hidden bg-slate-100">
+                {place.photoUrl ? (
+                  <img
+                    src={place.photoUrl}
+                    alt={place.title || place.location}
+                    className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    No photo available
+                  </div>
+                )}
 
-            return (
-              <button
-                key={`${place.location}-${i}`}
-                type="button"
-                onClick={() => onSelectPoint?.(place)}
-                className="text-left"
-              >
-                <TravelPhotoCard
-                  image={place.photoUrl}
-                  alt={place.photoAlt || place.title || place.location}
-                  badge={`Day ${place.day}${place.timeBlock ? ` • ${place.timeBlock}` : ""}`}
-                  title={place.title || place.location}
-                  subtitle={place.displayName || place.location}
-                  description={place.notes || ""}
-                  chips={[
-                    place.durationHours ? formatHours(Number(place.durationHours)) : "",
-                    place.category || "",
-                    place.type || "",
-                    isActive ? "Selected on map" : "",
-                  ]}
-                  address={place.address}
-                  attribution={place.photoAttribution}
-                  footer={
-                    <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
-                      <span className="truncate">{place.date || "Saved stop"}</span>
-                      <span className="shrink-0 font-semibold text-slate-400">
-                        {`Lat ${roundSafe(place.lat)} • Lon ${roundSafe(place.lon)}`}
-                      </span>
-                    </div>
-                  }
-                  imageHeight="h-56"
-                  active={isActive}
-                />
-              </button>
-            );
-          })}
+                <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white">
+                  Day {place.day} • {place.timeBlock}
+                </div>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {place.title || place.location}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {place.displayName || place.location}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {place.durationHours ? (
+                    <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">
+                      {formatHours(Number(place.durationHours))}
+                    </span>
+                  ) : null}
+
+                  {place.category ? (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                      {place.category}
+                    </span>
+                  ) : null}
+
+                  {place.type ? (
+                    <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+                      {place.type}
+                    </span>
+                  ) : null}
+                </div>
+
+                {place.notes ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                    {place.notes}
+                  </div>
+                ) : null}
+
+                {place.address ? (
+                  <div className="text-xs leading-5 text-slate-500">{place.address}</div>
+                ) : null}
+
+                {place.photoAttribution?.photographer ? (
+                  <div className="text-[11px] text-slate-400">
+                    Photo by {place.photoAttribution.photographer}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ))}
         </div>
       </CardBody>
     </Card>
