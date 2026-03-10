@@ -102,58 +102,176 @@ function getMarkerTitle(index, total) {
   return `Stop ${index + 1}`;
 }
 
-function createNumberedIcon(index, total) {
-  const variant = getMarkerVariant(index, total);
-
-  const stylesByVariant = {
-    single: {
-      bg: "linear-gradient(135deg, #0284c7, #2563eb)",
-      ring: "#ffffff",
-      label: "•",
-    },
-    start: {
+function getVariantTheme(variant) {
+  if (variant === "start") {
+    return {
       bg: "linear-gradient(135deg, #16a34a, #22c55e)",
-      ring: "#ffffff",
       label: "S",
-    },
-    middle: {
-      bg: "linear-gradient(135deg, #0284c7, #2563eb)",
-      ring: "#ffffff",
-      label: String(index + 1),
-    },
-    end: {
-      bg: "linear-gradient(135deg, #7c3aed, #a855f7)",
-      ring: "#ffffff",
-      label: "E",
-    },
-  };
+      badgeBg: "#dcfce7",
+      badgeColor: "#166534",
+    };
+  }
 
-  const style = stylesByVariant[variant];
+  if (variant === "end") {
+    return {
+      bg: "linear-gradient(135deg, #7c3aed, #a855f7)",
+      label: "E",
+      badgeBg: "#f3e8ff",
+      badgeColor: "#6b21a8",
+    };
+  }
+
+  if (variant === "single") {
+    return {
+      bg: "linear-gradient(135deg, #0284c7, #2563eb)",
+      label: "•",
+      badgeBg: "#e0f2fe",
+      badgeColor: "#075985",
+    };
+  }
+
+  return {
+    bg: "linear-gradient(135deg, #0284c7, #2563eb)",
+    label: null,
+    badgeBg: "#e0f2fe",
+    badgeColor: "#075985",
+  };
+}
+
+function createCustomPinIcon(index, total) {
+  const variant = getMarkerVariant(index, total);
+  const theme = getVariantTheme(variant);
+  const label = theme.label ?? String(index + 1);
 
   return L.divIcon({
-    className: "custom-numbered-marker",
+    className: "custom-image-marker",
     html: `
-      <div style="
-        width: 38px;
-        height: 38px;
-        border-radius: 9999px;
-        background: ${style.bg};
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 13px;
-        font-weight: 800;
-        border: 2px solid ${style.ring};
-        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.28);
-      ">
-        ${style.label}
+      <div style="position: relative; width: 42px; height: 54px;">
+        <div style="
+          position: absolute;
+          left: 50%;
+          top: 0;
+          transform: translateX(-50%);
+          width: 42px;
+          height: 42px;
+          border-radius: 9999px;
+          background: ${theme.bg};
+          border: 3px solid #ffffff;
+          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.28);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 13px;
+          font-weight: 800;
+        ">
+          ${label}
+        </div>
+
+        <div style="
+          position: absolute;
+          left: 50%;
+          bottom: 2px;
+          width: 14px;
+          height: 14px;
+          background: ${theme.bg};
+          transform: translateX(-50%) rotate(45deg);
+          border-right: 3px solid #ffffff;
+          border-bottom: 3px solid #ffffff;
+          box-sizing: border-box;
+        "></div>
       </div>
     `,
-    iconSize: [38, 38],
-    iconAnchor: [19, 19],
-    popupAnchor: [0, -20],
+    iconSize: [42, 54],
+    iconAnchor: [21, 54],
+    popupAnchor: [0, -46],
   });
+}
+
+function createPhotoMarkerIcon(point, index, total) {
+  const variant = getMarkerVariant(index, total);
+  const theme = getVariantTheme(variant);
+  const label = theme.label ?? String(index + 1);
+  const photoUrl = point?.photoUrl || "";
+  const safeLabel = String(label).replace(/"/g, "&quot;");
+  const safeAlt = String(getPopupLabel(point)).replace(/"/g, "&quot;");
+
+  return L.divIcon({
+    className: "custom-photo-marker",
+    html: `
+      <div style="position: relative; width: 56px; height: 68px;">
+        <div style="
+          position: absolute;
+          left: 50%;
+          top: 0;
+          transform: translateX(-50%);
+          width: 52px;
+          height: 52px;
+          border-radius: 9999px;
+          overflow: hidden;
+          border: 3px solid #ffffff;
+          box-shadow: 0 12px 24px rgba(15, 23, 42, 0.28);
+          background: #e2e8f0;
+        ">
+          <img
+            src="${photoUrl}"
+            alt="${safeAlt}"
+            style="
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              display: block;
+            "
+          />
+        </div>
+
+        <div style="
+          position: absolute;
+          left: 50%;
+          bottom: 2px;
+          width: 16px;
+          height: 16px;
+          background: ${theme.bg};
+          transform: translateX(-50%) rotate(45deg);
+          border-right: 3px solid #ffffff;
+          border-bottom: 3px solid #ffffff;
+          box-sizing: border-box;
+        "></div>
+
+        <div style="
+          position: absolute;
+          right: 0;
+          top: -2px;
+          min-width: 22px;
+          height: 22px;
+          padding: 0 6px;
+          border-radius: 9999px;
+          background: ${theme.bg};
+          color: white;
+          border: 2px solid #ffffff;
+          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 800;
+          line-height: 1;
+        ">
+          ${safeLabel}
+        </div>
+      </div>
+    `,
+    iconSize: [56, 68],
+    iconAnchor: [28, 68],
+    popupAnchor: [0, -56],
+  });
+}
+
+function createMarkerIcon(point, index, total) {
+  if (point?.photoUrl) {
+    return createPhotoMarkerIcon(point, index, total);
+  }
+  return createCustomPinIcon(index, total);
 }
 
 function RouteControl({ points }) {
@@ -227,7 +345,6 @@ function RouteControl({ points }) {
 
 function FitBounds({ points }) {
   const map = useMap();
-
   const valid = useMemo(() => (points ?? []).filter(isValidPoint), [points]);
 
   useEffect(() => {
@@ -354,12 +471,13 @@ export default function TripRouteMap({
 
         {validPoints.map((p, idx) => {
           const variant = getMarkerVariant(idx, validPoints.length);
+          const theme = getVariantTheme(variant);
 
           return (
             <Marker
               key={`${roundCoord(p.lat, 6)}-${roundCoord(p.lon, 6)}-${p.location || p.title || p.name || "p"}-${p.day || "d"}-${p.timeBlock || "b"}-${idx}`}
               position={[Number(p.lat), Number(p.lon)]}
-              icon={createNumberedIcon(idx, validPoints.length)}
+              icon={createMarkerIcon(p, idx, validPoints.length)}
             >
               <Popup>
                 <div style={{ maxWidth: 280 }}>
@@ -371,18 +489,8 @@ export default function TripRouteMap({
                       padding: "4px 10px",
                       fontSize: 11,
                       fontWeight: 700,
-                      background:
-                        variant === "start"
-                          ? "#dcfce7"
-                          : variant === "end"
-                          ? "#f3e8ff"
-                          : "#e0f2fe",
-                      color:
-                        variant === "start"
-                          ? "#166534"
-                          : variant === "end"
-                          ? "#6b21a8"
-                          : "#075985",
+                      background: theme.badgeBg,
+                      color: theme.badgeColor,
                     }}
                   >
                     {getMarkerTitle(idx, validPoints.length)}
