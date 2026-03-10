@@ -160,6 +160,9 @@ function normalizePlace(place) {
 }
 
 export default function CreateTrip() {
+    useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
 

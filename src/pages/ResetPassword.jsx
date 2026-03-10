@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { Card, CardHeader, CardBody, Input, Button, Alert } from "../components/UI";
 
 export default function ResetPassword() {
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
   const { token } = useParams();
   const nav = useNavigate();
 

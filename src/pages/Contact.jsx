@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "../api/client.js";
 import { useAuth } from "../auth/AuthProvider";
 import {
@@ -12,6 +12,9 @@ import {
 } from "../components/UI.jsx";
 
 export default function Contact() {
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
   const { user } = useAuth();
 
   const [form, setForm] = useState({

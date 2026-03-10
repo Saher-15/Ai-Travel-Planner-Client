@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import {
@@ -17,9 +17,11 @@ function normalizeEmail(value) {
 }
 
 export default function Login() {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const nav = useNavigate();
   const { refresh } = useAuth();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,7 @@ export default function Login() {
   const canSubmit = useMemo(() => {
     return normalizeEmail(email) && password.trim().length > 0 && !loading;
   }, [email, password, loading]);
+
 
   async function onSubmit(e) {
     e.preventDefault();

@@ -224,17 +224,19 @@ function Footer({ isLoggedIn, isAdmin }) {
           </div>
 
           <div>
-            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
-              Planner Features
-            </h3>
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <p>AI itinerary generation</p>
-              <p>Smart daily trip structure</p>
-              <p>Clean destination-first planning</p>
-              <p>Saved personal trip library</p>
-              <p>Responsive premium experience</p>
+              <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
+                Support
+              </h3>
+              <div className="mt-4 flex flex-col gap-3">
+                <FooterLink to="/contact">Contact Support</FooterLink>
+                <FooterLink to="/faq">FAQ</FooterLink>
+                <FooterLink to="/privacy">Privacy Policy</FooterLink>
+                <FooterLink to="/terms">Terms of Service</FooterLink>
+                <FooterExternalLink href={DEVELOPER_LINKEDIN}>
+                  Developer LinkedIn
+                </FooterExternalLink>
+              </div>
             </div>
-          </div>
 
           <div>
             <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">

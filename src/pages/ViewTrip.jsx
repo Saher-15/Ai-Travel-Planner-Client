@@ -353,6 +353,9 @@ function scrollToDay(dayNumber) {
 }
 
 export default function ViewTrip() {
+    useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const nav = useNavigate();
   const { id } = useParams();
 

@@ -1,6 +1,10 @@
 import { Card, CardBody, CardHeader, Badge } from "../components/UI.jsx";
+import { useEffect } from "react";
 
 export default function About() {
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
   return (
     <div className="space-y-6">
       <Card>

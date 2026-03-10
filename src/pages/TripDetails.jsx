@@ -65,6 +65,9 @@ function InfoTile({ label, value }) {
 }
 
 export default function TripDetails() {
+    useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const { id } = useParams();
   const nav = useNavigate();
 

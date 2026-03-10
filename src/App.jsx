@@ -15,6 +15,9 @@ import EditTrip from "./pages/EditTrip.jsx";
 import Contact from "./pages/Contact.jsx";
 import Profile from "./pages/Profile.jsx";
 import AdminContacts from "./pages/AdminContacts.jsx";
+import FAQ from "./pages/FAQ.jsx";
+import Privacy from "./pages/Privacy.jsx";
+import Terms from "./pages/Terms.jsx";
 
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
@@ -51,6 +54,9 @@ function AppRoutes() {
 
         <Route path="/contact" element={<Contact />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/faq" element={<FAQ />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
 
         <Route path="/create" element={<P><CreateTrip /></P>} />
         <Route path="/result" element={<P><TripResult /></P>} />

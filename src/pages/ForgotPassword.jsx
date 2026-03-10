@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "../api/client";
 import { Card, CardHeader, CardBody, Input, Button, Alert } from "../components/UI";
 
 export default function ForgotPassword() {
+    useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");

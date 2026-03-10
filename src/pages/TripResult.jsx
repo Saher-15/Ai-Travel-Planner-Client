@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { api } from "../api/client.js";
 import {
   Alert,
@@ -84,6 +84,9 @@ function TipsGrid({ tips }) {
 }
 
 export default function TripResult() {
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
   const nav = useNavigate();
   const { state } = useLocation();
 

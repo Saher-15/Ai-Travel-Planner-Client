@@ -16,6 +16,9 @@ function fmtRange(start, end) {
 }
 
 export default function MyTrips() {
+    useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const nav = useNavigate();
 
   const [trips, setTrips] = useState([]);

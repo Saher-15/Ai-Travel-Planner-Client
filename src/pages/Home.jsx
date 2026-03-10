@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, CardBody, Badge } from "../components/UI.jsx";
 
@@ -124,6 +124,9 @@ const travelModes = [
 ];
 
 export default function Home() {
+    useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const nav = useNavigate();
   const [a, b, c] = useMemo(() => STOCK.hero, []);
 

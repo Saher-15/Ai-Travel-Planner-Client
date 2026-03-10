@@ -5,6 +5,9 @@ import { useAuth } from "../auth/AuthProvider";
 import { Card, CardHeader, CardBody, Button } from "../components/UI";
 
 export default function VerifyEmail() {
+    useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const { token } = useParams();
   const nav = useNavigate();
   const { refresh } = useAuth();

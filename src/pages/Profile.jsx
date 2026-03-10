@@ -25,6 +25,9 @@ function truncateText(text, max = 60) {
 const SUPPORT_PAGE_SIZE = 6;
 
 export default function Profile() {
+    useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const nav = useNavigate();
   const { user, logout } = useAuth();
 
