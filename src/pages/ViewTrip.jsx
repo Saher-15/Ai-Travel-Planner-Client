@@ -9,7 +9,6 @@ import {
   CardBody,
   CardHeader,
 } from "../components/UI.jsx";
-import TripRouteMap from "../components/TripRouteMap.jsx";
 
 const BLOCKS = ["morning", "afternoon", "evening"];
 const BLOCK_ORDER = { morning: 1, afternoon: 2, evening: 3 };
@@ -25,6 +24,10 @@ function normalizeTripMode(mode) {
   return mode === "multi" ? "multi" : "single";
 }
 
+function normalizeText(value = "") {
+  return String(value || "").trim().toLowerCase();
+}
+
 function getTripDestinations(trip) {
   if (Array.isArray(trip?.destinations) && trip.destinations.length) {
     return trip.destinations.filter(Boolean);
@@ -33,7 +36,30 @@ function getTripDestinations(trip) {
   return trip?.destination ? [trip.destination] : [];
 }
 
-function extractUniqueLocations(itinerary) {
+function getRecommendedPlaces(trip) {
+  if (Array.isArray(trip?.recommendedPlaces)) return trip.recommendedPlaces;
+  if (Array.isArray(trip?.itinerary?.recommendedPlaces)) {
+    return trip.itinerary.recommendedPlaces;
+  }
+  if (Array.isArray(trip?.recommendations)) return trip.recommendations;
+  return [];
+}
+
+function buildPhotoQuery(activity = {}, destination = "") {
+  return [
+    activity?.title,
+    activity?.name,
+    activity?.placeName,
+    activity?.location,
+    activity?.address,
+    destination,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
+function extractUniqueLocations(itinerary, destination = "") {
   const rows =
     itinerary?.days?.flatMap((d) =>
       BLOCKS.flatMap((block) =>
@@ -46,37 +72,24 @@ function extractUniqueLocations(itinerary) {
             location: (a?.location || "").trim(),
             notes: a?.notes || "",
             durationHours: a?.durationHours ?? null,
+            type: a?.type || "",
+            category: a?.category || "",
+            address: a?.address || "",
+            image: a?.image || a?.imageUrl || a?.photo || a?.photoUrl || null,
+            photoQuery: buildPhotoQuery(a, destination),
           }))
           .filter((x) => x.location)
       )
     ) ?? [];
 
   const unique = Array.from(
-    new Map(rows.map((x) => [x.location.toLowerCase(), x])).values()
+    new Map(rows.map((x) => [normalizeText(x.location), x])).values()
   );
 
   return unique.sort(
     (a, b) =>
       (a.day ?? 0) - (b.day ?? 0) ||
       (BLOCK_ORDER[a.timeBlock] ?? 99) - (BLOCK_ORDER[b.timeBlock] ?? 99)
-  );
-}
-
-function extractRecommendedPlaces(itinerary) {
-  const rows = Array.isArray(itinerary?.recommendedPlaces)
-    ? itinerary.recommendedPlaces
-      .map((p, index) => ({
-        id: `${p?.name || "place"}-${index}`,
-        name: (p?.name || "Recommended Place").trim(),
-        reason: (p?.reason || "").trim(),
-        category: (p?.category || "").trim(),
-        location: (p?.location || "").trim(),
-      }))
-      .filter((p) => p.location)
-    : [];
-
-  return Array.from(
-    new Map(rows.map((x) => [x.location.toLowerCase(), x])).values()
   );
 }
 
@@ -125,6 +138,7 @@ function useAsync(fn, deps) {
             loading: false,
             error:
               e?.response?.data?.message ||
+              e?.response?.data?.details?.message ||
               e?.message ||
               "Something went wrong",
           });
@@ -141,209 +155,58 @@ function useAsync(fn, deps) {
   return state;
 }
 
-function useGeoPoints(locations) {
-  const stableLocations = useMemo(() => {
-    return Array.isArray(locations) ? locations.filter((x) => x?.location) : [];
-  }, [locations]);
+function usePlacePhotos(places, destination = "") {
+  const stablePlaces = useMemo(
+    () => (Array.isArray(places) ? places.filter(Boolean) : []),
+    [places]
+  );
 
   return useAsync(async () => {
-    if (!stableLocations.length) return { points: [], failed: [] };
+    if (!stablePlaces.length) return [];
 
-    const normalize = (s) => String(s || "").trim().toLowerCase();
-    const includesCity = (text, city) =>
-      normalize(text).includes(normalize(city));
+    const payload = stablePlaces.map((item) => ({
+      query:
+        item.photoQuery ||
+        buildPhotoQuery(item, destination) ||
+        item.title ||
+        item.name ||
+        item.placeName ||
+        item.location ||
+        "",
+      title: item.title || item.name || item.placeName || "",
+      location: item.location || "",
+      address: item.address || "",
+      destination,
+    }));
 
-    const queries = stableLocations.map((p) => p.location);
-    const { data: geo } = await api.post("/geocode/batch", { queries });
+    const { data } = await api.post("/places/photos", { places: payload });
+    const results = Array.isArray(data?.results) ? data.results : [];
 
-    const results = Array.isArray(geo?.results) ? geo.results : [];
-    const byQuery = new Map(results.map((r) => [normalize(r.query), r]));
+    return stablePlaces.map((item) => {
+      const itemKey = normalizeText(
+        item.photoQuery ||
+        buildPhotoQuery(item, destination) ||
+        item.title ||
+        item.name ||
+        item.placeName ||
+        item.location
+      );
 
-    const points = [];
-    const failed = [];
+      const match = results.find((r) => normalizeText(r?.query) === itemKey);
 
-    async function retrySingle(forcedQuery) {
-      const { data } = await api.post("/geocode/batch", {
-        queries: [forcedQuery],
-      });
-      const r = Array.isArray(data?.results) ? data.results[0] : null;
-      return r && Number.isFinite(Number(r.lat)) && Number.isFinite(Number(r.lon))
-        ? r
-        : null;
-    }
-
-    for (const p of stableLocations) {
-      const q = p.location.trim();
-      const qNorm = normalize(q);
-
-      let hit = byQuery.get(qNorm) || null;
-
-      const hitLat = Number(hit?.lat);
-      const hitLon = Number(hit?.lon);
-
-      const wantsParis = qNorm.includes("paris");
-      const hitName = hit?.display_name || "";
-      const looksWrongCity = wantsParis && hit && !includesCity(hitName, "paris");
-
-      if (!Number.isFinite(hitLat) || !Number.isFinite(hitLon) || looksWrongCity) {
-        const forced = wantsParis
-          ? `${q.replace(/,?\s*paris.*$/i, "")}, Paris, Île-de-France, France`
-          : q;
-
-        const retried = await retrySingle(forced);
-
-        if (retried) {
-          hit = retried;
-        } else {
-          failed.push({
-            q,
-            reason: !hit
-              ? "No match returned"
-              : looksWrongCity
-                ? "Matched wrong city (retry failed)"
-                : "No lat/lon returned",
-          });
-          continue;
-        }
-      }
-
-      const lat = Number(hit?.lat);
-      const lon = Number(hit?.lon);
-
-      try {
-        const { data: detail } = await api.get("/geocode/place-details", {
-          params: { lat, lon, q },
-        });
-
-        points.push({
-          ...p,
-          lat,
-          lon,
-          displayName: detail?.display_name ?? hit?.display_name ?? null,
-          category: p?.category || detail?.category || null,
-          type: detail?.type ?? null,
-          address: detail?.address ?? null,
-          photoUrl: detail?.photoUrl ?? null,
-          photoAttribution: detail?.photoAttribution ?? null,
-        });
-      } catch {
-        points.push({
-          ...p,
-          lat,
-          lon,
-          displayName: hit?.display_name ?? null,
-        });
-      }
-    }
-
-    return { points, failed };
-  }, [stableLocations]);
-}
-
-function useDestinationWeather(destination, fallbackPoint) {
-  return useAsync(async () => {
-    if (!destination && !fallbackPoint) return null;
-
-    let lat = Number(fallbackPoint?.lat);
-    let lon = Number(fallbackPoint?.lon);
-    let resolvedName = destination || fallbackPoint?.displayName || "";
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      const { data } = await api.post("/geocode/batch", {
-        queries: [destination],
-      });
-
-      const first = Array.isArray(data?.results) ? data.results[0] : null;
-      lat = Number(first?.lat);
-      lon = Number(first?.lon);
-      resolvedName = first?.display_name || resolvedName;
-    }
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      throw new Error("Could not find destination weather coordinates.");
-    }
-
-    const url =
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}` +
-      `&longitude=${lon}` +
-      `&current=temperature_2m,apparent_temperature,wind_speed_10m,weather_code` +
-      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
-      `&forecast_days=7&timezone=auto`;
-
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error("Failed to load weather.");
-    }
-
-    const weather = await res.json();
-
-    return {
-      name: resolvedName || destination,
-      lat,
-      lon,
-      current: weather?.current ?? null,
-      daily: weather?.daily ?? null,
-    };
-  }, [
-    destination,
-    fallbackPoint?.lat,
-    fallbackPoint?.lon,
-    fallbackPoint?.displayName,
-  ]);
-}
-
-function weatherCodeToLabel(code) {
-  const map = {
-    0: "Clear sky",
-    1: "Mostly clear",
-    2: "Partly cloudy",
-    3: "Overcast",
-    45: "Fog",
-    48: "Depositing rime fog",
-    51: "Light drizzle",
-    53: "Moderate drizzle",
-    55: "Dense drizzle",
-    56: "Light freezing drizzle",
-    57: "Dense freezing drizzle",
-    61: "Slight rain",
-    63: "Moderate rain",
-    65: "Heavy rain",
-    66: "Light freezing rain",
-    67: "Heavy freezing rain",
-    71: "Slight snow",
-    73: "Moderate snow",
-    75: "Heavy snow",
-    77: "Snow grains",
-    80: "Rain showers",
-    81: "Moderate rain showers",
-    82: "Violent rain showers",
-    85: "Snow showers",
-    86: "Heavy snow showers",
-    95: "Thunderstorm",
-    96: "Thunderstorm with hail",
-    99: "Severe thunderstorm with hail",
-  };
-
-  return map[code] || "Weather update";
-}
-
-function weatherCodeToEmoji(code) {
-  if (code === 0) return "☀️";
-  if ([1, 2].includes(code)) return "🌤️";
-  if (code === 3) return "☁️";
-  if ([45, 48].includes(code)) return "🌫️";
-  if ([51, 53, 55, 56, 57].includes(code)) return "🌦️";
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "🌧️";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "❄️";
-  if ([95, 96, 99].includes(code)) return "⛈️";
-  return "🌍";
-}
-
-function dayName(dateStr) {
-  if (!dateStr) return "Day";
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString(undefined, { weekday: "short" });
+      return {
+        ...item,
+        photoUrl:
+          item.photoUrl ||
+          item.image ||
+          item.imageUrl ||
+          item.photo ||
+          match?.photoUrl ||
+          null,
+        photoAttribution: item.photoAttribution || match?.photoAttribution || null,
+      };
+    });
+  }, [stablePlaces, destination]);
 }
 
 function scrollToDay(dayNumber) {
@@ -352,10 +215,33 @@ function scrollToDay(dayNumber) {
   el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function buildGoogleMapsUrl(place) {
+  const query =
+    place?.address ||
+    place?.location ||
+    place?.title ||
+    place?.name ||
+    place?.placeName ||
+    "";
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function GoogleMapsButton({ place, className = "" }) {
+  const url = buildGoogleMapsUrl(place);
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className={className}>
+      Open in Google Maps
+    </a>
+  );
+}
+
 export default function ViewTrip() {
-    useEffect(() => {
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
   const nav = useNavigate();
   const { id } = useParams();
 
@@ -364,7 +250,9 @@ export default function ViewTrip() {
   const summary = trip?.itinerary?.tripSummary || {};
   const tripMode = normalizeTripMode(trip?.tripMode);
   const destinations = getTripDestinations(trip);
-  const primaryDestination = destinations[0] || trip?.destination || "";
+  const primaryDestination = trip?.destination || destinations[0] || "";
+
+  const rawRecommendedPlaces = useMemo(() => getRecommendedPlaces(trip), [trip]);
 
   const pdfRef = useRef(null);
   const [openDays, setOpenDays] = useState({});
@@ -379,21 +267,28 @@ export default function ViewTrip() {
     setOpenDays(next);
   }, [trip]);
 
-  const locations = useMemo(() => extractUniqueLocations(trip?.itinerary), [trip]);
-  const recommendedPlaces = useMemo(
-    () => extractRecommendedPlaces(trip?.itinerary),
-    [trip]
+  const locations = useMemo(
+    () => extractUniqueLocations(trip?.itinerary, primaryDestination),
+    [trip, primaryDestination]
   );
-  const examples = useMemo(() => locations.slice(0, 3).map((x) => x.location), [locations]);
 
-  const geoState = useGeoPoints(locations);
-  const mapPoints = geoState.data?.points ?? [];
-  const geoFailed = geoState.data?.failed ?? [];
+  const itineraryPhotosState = usePlacePhotos(locations, primaryDestination);
+  const placesWithPhotos = itineraryPhotosState.data || locations;
 
-  const recommendedGeoState = useGeoPoints(recommendedPlaces);
-  const recommendedPoints = recommendedGeoState.data?.points ?? [];
+  const recommendedBase = useMemo(
+    () =>
+      rawRecommendedPlaces.map((place) => ({
+        ...place,
+        photoQuery: buildPhotoQuery(place, primaryDestination),
+      })),
+    [rawRecommendedPlaces, primaryDestination]
+  );
 
-  const weatherState = useDestinationWeather(primaryDestination, mapPoints[0]);
+  const recommendedPhotosState = usePlacePhotos(
+    recommendedBase,
+    primaryDestination
+  );
+  const recommendedPlaces = recommendedPhotosState.data || recommendedBase;
 
   const totalActivities = useMemo(() => {
     return (trip?.itinerary?.days || []).reduce(
@@ -409,7 +304,7 @@ export default function ViewTrip() {
     );
   }, [trip]);
 
-  const mapPlaceCount = useMemo(() => locations.length || 0, [locations]);
+  const placeCount = useMemo(() => locations.length || 0, [locations]);
 
   const toggleDay = (dayNumber) => {
     setOpenDays((prev) => ({
@@ -434,16 +329,7 @@ export default function ViewTrip() {
     setOpenDays(next);
   };
 
-  const handleJumpToDay = (dayNumber) => {
-    setOpenDays((prev) => ({
-      ...prev,
-      [dayNumber]: true,
-    }));
 
-    requestAnimationFrame(() => {
-      scrollToDay(dayNumber);
-    });
-  };
 
   const downloadPDF = async () => {
     setDownloadError("");
@@ -485,7 +371,7 @@ export default function ViewTrip() {
 
   if (tripState.error) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="mx-auto max-w-2xl space-y-4 px-4 py-6">
         <Alert type="error">{tripState.error}</Alert>
         <div className="flex gap-2">
           <Button onClick={() => nav("/trips")} variant="secondary">
@@ -500,10 +386,19 @@ export default function ViewTrip() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:px-6 lg:px-8">
       {downloadError ? <Alert type="error">{downloadError}</Alert> : null}
+      {itineraryPhotosState.error ? (
+        <Alert type="error">{itineraryPhotosState.error}</Alert>
+      ) : null}
+      {recommendedPhotosState.error ? (
+        <Alert type="error">{recommendedPhotosState.error}</Alert>
+      ) : null}
 
-      <div ref={pdfRef} className="space-y-6">
+      <div
+        ref={pdfRef}
+        className="space-y-8 rounded-[2rem] bg-gradient-to-b from-slate-50 via-white to-sky-50/40 p-1"
+      >
         <Header
           trip={trip}
           summary={summary}
@@ -522,7 +417,7 @@ export default function ViewTrip() {
           destinations={destinations}
           totalActivities={totalActivities}
           totalHours={totalHours}
-          mapPlaceCount={mapPlaceCount}
+          placeCount={placeCount}
         />
 
         <CityPlanSection
@@ -531,22 +426,11 @@ export default function ViewTrip() {
           destinations={destinations}
         />
 
-        <WeatherSection
-          state={weatherState}
-          destination={primaryDestination}
-          tripMode={tripMode}
-        />
-
         <EventsSection events={trip?.events || []} />
 
-        {!!trip?.itinerary?.days?.length && (
-          <DayNavigator
-            days={trip.itinerary.days}
-            openAll={openAllDays}
-            collapseAll={collapseAllDays}
-            onJump={handleJumpToDay}
-          />
-        )}
+        
+
+
 
         <div className="grid gap-6 lg:grid-cols-2">
           {trip?.itinerary?.days?.map((d) => (
@@ -560,18 +444,21 @@ export default function ViewTrip() {
         </div>
 
         {!!trip?.itinerary?.tips?.length && (
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
             <CardHeader
               title="Trip Tips"
               subtitle="Helpful reminders for a smoother travel experience"
             />
             <CardBody>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 {trip.itinerary.tips.map((t, i) => (
                   <div
                     key={i}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700"
+                    className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 text-sm leading-6 text-slate-700 shadow-sm"
                   >
+                    <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-sky-600">
+                      Tip {i + 1}
+                    </div>
                     {t}
                   </div>
                 ))}
@@ -580,107 +467,16 @@ export default function ViewTrip() {
           </Card>
         )}
 
-        {!!trip?.itinerary?.recommendedPlaces?.length && (
-          <RecommendedPlacesSection
-            places={trip.itinerary.recommendedPlaces}
-            enrichedPlaces={recommendedPoints}
-            loading={recommendedGeoState.loading}
-            error={recommendedGeoState.error}
-          />
-        )}
-      </div>
-
-      <Card className="relative z-0 overflow-hidden">
-        <CardHeader
-          title="Destination Map"
-          subtitle={
-            tripMode === "multi"
-              ? "Places and route across your multi-city itinerary"
-              : "Places and route from your itinerary"
-          }
+        <PlacesGallery
+          points={placesWithPhotos}
+          loading={itineraryPhotosState.loading}
         />
 
-        <CardBody className="space-y-4">
-          {geoState.error ? <Alert type="error">{geoState.error}</Alert> : null}
-
-          {geoState.loading ? (
-            <MapSkeleton />
-          ) : locations.length === 0 ? (
-            <NiceEmptyState
-              title="No map locations found"
-              subtitle="This saved itinerary doesn’t include activity location fields."
-              action={
-                <Button onClick={() => nav("/create")} variant="secondary">
-                  Create a new trip
-                </Button>
-              }
-            />
-          ) : mapPoints.length === 0 ? (
-            <NiceEmptyState
-              title="We couldn’t geocode your locations"
-              subtitle={
-                <>
-                  Found <b>{locations.length}</b> location strings, but got <b>0</b>{" "}
-                  coordinates back.
-                </>
-              }
-              hint={
-                <div className="space-y-2">
-                  <div className="break-words text-xs text-slate-500">
-                    Example queries: {examples.join(" | ")}
-                  </div>
-                  {geoFailed.length ? (
-                    <div className="break-words text-xs text-slate-500">
-                      Failed examples:{" "}
-                      {geoFailed
-                        .slice(0, 3)
-                        .map((x) => `${x.q} (${x.reason})`)
-                        .join(" | ")}
-                    </div>
-                  ) : null}
-                </div>
-              }
-              action={
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => window.location.reload()} variant="secondary">
-                    Retry
-                  </Button>
-                  <Button onClick={() => nav("/create")} variant="ghost">
-                    Create New
-                  </Button>
-                </div>
-              }
-            />
-          ) : (
-            <>
-              <div className="relative z-0 overflow-hidden rounded-3xl border border-slate-200">
-                <TripRouteMap
-                  points={mapPoints}
-                  storageKey={`trip-route-points-${id}`}
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                <div>
-                  Showing <b>{mapPoints.length}</b> pinned places
-                  {mapPoints.length > 1 ? " with route" : ""}.
-                </div>
-                <div>
-                  Total requested: <b>{locations.length}</b>
-                  {geoFailed.length ? (
-                    <>
-                      {" "}
-                      • Failed: <b>{geoFailed.length}</b>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            </>
-          )}
-        </CardBody>
-      </Card>
-
-      {mapPoints.length > 0 && <PlacesGallery points={mapPoints} />}
+        <RecommendedPlacesSection
+          places={recommendedPlaces}
+          loading={recommendedPhotosState.loading}
+        />
+      </div>
     </div>
   );
 }
@@ -696,28 +492,29 @@ function Header({
   onDownload,
 }) {
   return (
-    <Card className="relative z-50 isolate overflow-hidden">
-      <div className="pointer-events-auto relative z-50 bg-gradient-to-r from-sky-700 via-blue-700 to-indigo-800 text-white">
-        <div className="flex flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-white/80">
-              {tripMode === "multi" ? "Your Multi-City Trip" : "Your Trip"}
+    <Card className="relative overflow-hidden border-0 shadow-[0_24px_80px_-28px_rgba(37,99,235,0.55)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.10),transparent_24%)]" />
+      <div className="relative bg-gradient-to-br from-sky-700 via-blue-700 to-indigo-900 text-white">
+        <div className="flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.25em] text-white/85">
+              {tripMode === "multi" ? "Multi-city itinerary" : "Smart travel plan"}
             </div>
 
-            <div className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+            <div className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
               {trip?.destination || "Trip"}
             </div>
 
-            <div className="mt-2 text-sm text-white/85">
+            <div className="mt-2 text-sm text-white/85 sm:text-base">
               {fmtRange(trip?.startDate, trip?.endDate)}
             </div>
 
             {tripMode === "multi" && destinations.length > 1 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                 {destinations.map((city) => (
                   <span
                     key={city}
-                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white"
+                    className="rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-sm"
                   >
                     {city}
                   </span>
@@ -726,72 +523,72 @@ function Header({
             ) : null}
           </div>
 
-          <div className="flex flex-wrap gap-2 md:justify-end">
+          <div className="flex flex-wrap gap-2 lg:max-w-md lg:justify-end">
             {summary.days ? (
-              <Badge className="border-white/20 bg-white/10 text-white">
+              <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
                 {summary.days} days
               </Badge>
             ) : null}
 
             {tripMode === "multi" ? (
-              <Badge className="border-white/20 bg-white/10 text-white">
+              <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
                 {destinations.length} cities
               </Badge>
             ) : null}
 
             {summary.style ? (
-              <Badge className="border-white/20 bg-white/10 text-white">
+              <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
                 pace: {summary.style}
               </Badge>
             ) : null}
 
             {summary.budget ? (
-              <Badge className="border-white/20 bg-white/10 text-white">
+              <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
                 budget: {summary.budget}
               </Badge>
             ) : null}
 
             {!!trip?.events?.length ? (
-              <Badge className="border-white/20 bg-white/10 text-white">
+              <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
                 {trip.events.length} events
               </Badge>
             ) : null}
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 px-6 pb-6">
+        <div className="relative z-10 flex flex-wrap gap-3 px-6 pb-7 sm:px-8">
           <Button type="button" onClick={onBack} variant="secondary">
-            Back to My Trips
+            ← Back to My Trips
           </Button>
 
           <Button
             type="button"
             onClick={onEdit}
             variant="secondary"
-            className="bg-white/15 text-white hover:bg-white/20"
+            className="bg-white/15 text-white backdrop-blur hover:bg-white/20"
           >
-            Edit Trip
+            ✏️ Edit Trip
           </Button>
 
           <Button
             type="button"
             onClick={onNew}
             variant="ghost"
-            className="bg-white/10 text-white hover:bg-white/15"
+            className="bg-white/10 text-white backdrop-blur hover:bg-white/15"
           >
-            Create New
+            ＋ Create New
           </Button>
 
           <Button
             type="button"
-            className="pointer-events-auto"
+            className="bg-white text-sky-800 shadow-lg hover:bg-sky-50"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               onDownload?.();
             }}
           >
-            Download PDF
+            ⬇ Download PDF
           </Button>
         </div>
       </div>
@@ -806,7 +603,7 @@ function TripOverview({
   destinations,
   totalActivities,
   totalHours,
-  mapPlaceCount,
+  placeCount,
 }) {
   const preferences = trip?.preferences || {};
   const interests = Array.isArray(preferences?.interests)
@@ -814,39 +611,56 @@ function TripOverview({
     : [];
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
         title="Trip Overview"
         subtitle="A quick summary of the trip settings and preferences"
       />
-      <CardBody className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <InfoTile
+      <CardBody className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <FancyInfoTile
             label={tripMode === "multi" ? "Trip mode" : "Destination"}
             value={tripMode === "multi" ? "Multi-city" : trip?.destination || "—"}
+            icon="🌍"
           />
-          <InfoTile label="Dates" value={fmtRange(trip?.startDate, trip?.endDate) || "—"} />
-          <InfoTile label="Pace" value={summary?.style || preferences?.pace || "—"} />
-          <InfoTile label="Budget" value={summary?.budget || preferences?.budget || "—"} />
+          <FancyInfoTile
+            label="Dates"
+            value={fmtRange(trip?.startDate, trip?.endDate) || "—"}
+            icon="📅"
+          />
+          <FancyInfoTile
+            label="Pace"
+            value={summary?.style || preferences?.pace || "—"}
+            icon="⚡"
+          />
+          <FancyInfoTile
+            label="Budget"
+            value={summary?.budget || preferences?.budget || "—"}
+            icon="💳"
+          />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <InfoTile label="Activities" value={totalActivities || "0"} />
-          <InfoTile label="Estimated Hours" value={formatHours(totalHours)} />
-          <InfoTile label="Events" value={trip?.events?.length || "0"} />
-          <InfoTile label="Map Places" value={mapPlaceCount || "0"} />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <FancyInfoTile label="Activities" value={totalActivities || "0"} icon="🧭" />
+          <FancyInfoTile
+            label="Estimated Hours"
+            value={formatHours(totalHours)}
+            icon="⏱️"
+          />
+          <FancyInfoTile label="Events" value={trip?.events?.length || "0"} icon="🎟️" />
+          <FancyInfoTile label="Places" value={placeCount || "0"} icon="📍" />
         </div>
 
         {tripMode === "multi" && destinations.length > 1 ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+          <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-r from-sky-50 to-indigo-50 p-5">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
               Cities in this trip
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2.5">
               {destinations.map((city) => (
                 <span
                   key={city}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                  className="rounded-full border border-white bg-white/80 px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm"
                 >
                   {city}
                 </span>
@@ -857,14 +671,14 @@ function TripOverview({
 
         {!!interests.length && (
           <div>
-            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
               Interests
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2.5">
               {interests.map((item) => (
                 <span
                   key={item}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold capitalize text-slate-700"
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-semibold capitalize text-slate-700"
                 >
                   {item}
                 </span>
@@ -874,11 +688,11 @@ function TripOverview({
         )}
 
         {preferences?.notes ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+          <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
               Notes
             </div>
-            <div className="mt-2 text-sm leading-6 text-slate-700">
+            <div className="mt-3 text-sm leading-7 text-slate-700">
               {preferences.notes}
             </div>
           </div>
@@ -894,11 +708,11 @@ function CityPlanSection({ summary, tripMode, destinations }) {
   if (tripMode !== "multi" || !destinations.length) return null;
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
         title="City Plan"
         subtitle="How your days are distributed across the cities in this trip"
-        right={<Badge>{destinations.length} cities</Badge>}
+        right={<Badge className="bg-sky-50 text-sky-700">{destinations.length} cities</Badge>}
       />
       <CardBody>
         {cityPlan.length ? (
@@ -906,73 +720,173 @@ function CityPlanSection({ summary, tripMode, destinations }) {
             {cityPlan.map((segment, index) => (
               <div
                 key={`${segment.city}-${index}`}
-                className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4"
+                className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-indigo-50/60 p-5 shadow-sm"
               >
-                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
                   City {index + 1}
                 </div>
-                <div className="mt-1 text-base font-bold text-slate-900">
+                <div className="mt-2 text-lg font-extrabold tracking-tight text-slate-900">
                   {segment.city}
                 </div>
-                <div className="mt-2 text-sm text-slate-600">
+                <div className="mt-3 inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
                   {segment.days} day{segment.days > 1 ? "s" : ""}
                 </div>
-                <div className="mt-1 text-xs text-slate-500">
+                <div className="mt-3 text-sm text-slate-600">
                   {fmtRange(segment.startDate, segment.endDate)}
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            This is a multi-city trip with {destinations.length} cities.
-          </div>
+          <SoftMessage>This is a multi-city trip with {destinations.length} cities.</SoftMessage>
         )}
       </CardBody>
     </Card>
   );
 }
 
-function DayNavigator({ days, openAll, collapseAll, onJump }) {
+
+function RecommendedPlacesSection({ places, loading }) {
+  if (!places?.length && !loading) return null;
+
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
-        title="Jump to a Day"
-        subtitle="Quick navigation for longer itineraries"
+        title="Recommended Places"
+        subtitle="Special places selected for your trip"
         right={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              className="px-3 py-2 text-xs"
-              onClick={openAll}
-            >
-              Expand all
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="px-3 py-2 text-xs"
-              onClick={collapseAll}
-            >
-              Collapse all
-            </Button>
-          </div>
+          !loading ? (
+            <Badge className="bg-sky-50 text-sky-700">{places.length} places</Badge>
+          ) : null
         }
       />
       <CardBody>
-        <div className="flex flex-wrap gap-2">
-          {days.map((day) => (
-            <button
-              key={day.day}
-              type="button"
-              onClick={() => onJump?.(day.day)}
-              className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
-            >
-              Day {day.day}
-            </button>
-          ))}
-        </div>
+        {loading && !places?.length ? (
+          <SoftMessage>Loading recommended place photos...</SoftMessage>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {places.map((place, i) => {
+              const title =
+                place?.title ||
+                place?.name ||
+                place?.placeName ||
+                place?.location ||
+                "Recommended Place";
+
+              const subtitle =
+                place?.location || place?.displayName || place?.address || "";
+
+              const image =
+                place?.photoUrl ||
+                place?.image ||
+                place?.imageUrl ||
+                place?.photo ||
+                null;
+
+              const description =
+                place?.description ||
+                place?.notes ||
+                place?.summary ||
+                "";
+
+              const dayNumber = place?.day || place?.dayNumber || null;
+              const category = place?.category || place?.type || "";
+              const duration = place?.durationHours || place?.estimatedHours || null;
+
+              return (
+                <div
+                  key={place?._id || place?.id || `${title}-${i}`}
+                  className="group overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1.5 hover:shadow-xl"
+                >
+                  <div className="relative h-56 overflow-hidden bg-slate-100">
+                    {image ? (
+                      <img
+                        src={image}
+                        alt={title}
+                        className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
+                        No photo available
+                      </div>
+                    )}
+
+                    <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
+
+                    {dayNumber ? (
+                      <div className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                        Day {dayNumber}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-4 p-5">
+                    <div>
+                      <div className="text-lg font-extrabold tracking-tight text-slate-900">
+                        {title}
+                      </div>
+
+                      {place?.location ? (
+                        <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                          📍 {place.location}
+                        </div>
+                      ) : place?.address ? (
+                        <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                          📍 {place.address}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    
+
+                    {description ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">
+                        {description}
+                      </div>
+                    ) : null}
+
+                    {place?.address ? (
+                      <div className="text-xs leading-5 text-slate-500">
+                        {place.address}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <GoogleMapsButton
+                        place={place}
+                        className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
+                      />
+
+
+                    </div>
+
+                    {place.photoAttribution?.photographer ? (
+                      <div className="text-[11px] text-slate-400">
+                        Photo by{" "}
+                        {place.photoAttribution?.photographerUrl ? (
+                          <a
+                            href={place.photoAttribution.photographerUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline transition hover:text-slate-500"
+                          >
+                            {place.photoAttribution.photographer}
+                          </a>
+                        ) : (
+                          place.photoAttribution.photographer
+                        )}
+                        {place.photoAttribution?.source
+                          ? ` on ${place.photoAttribution.source}`
+                          : ""}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </CardBody>
     </Card>
   );
@@ -991,16 +905,16 @@ function EventsSection({ events }) {
   const orderedDates = Object.keys(grouped).sort();
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
         title="Events During Your Trip"
         subtitle="Local events, parties, concerts, and activities matching your trip dates"
-        right={<Badge>{events.length} events</Badge>}
+        right={<Badge className="bg-sky-50 text-sky-700">{events.length} events</Badge>}
       />
-      <CardBody className="space-y-5">
+      <CardBody className="space-y-6">
         {orderedDates.map((dateKey) => (
           <div key={dateKey}>
-            <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <div className="mb-4 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-slate-600">
               {dateKey}
             </div>
 
@@ -1008,54 +922,55 @@ function EventsSection({ events }) {
               {grouped[dateKey].map((event, i) => (
                 <div
                   key={`${event.name}-${event.date}-${i}`}
-                  className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-4"
+                  className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-sm font-bold text-slate-900">
+                    <div className="text-base font-extrabold tracking-tight text-slate-900">
                       {event.name || "Event"}
                     </div>
 
-                    {event.category ? (
-                      <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
-                        {event.category}
-                      </span>
-                    ) : null}
+                    {event.category ? <Tag color="sky">{event.category}</Tag> : null}
                   </div>
 
-                  <div className="mt-2 text-xs text-slate-500">
+                  <div className="mt-3 text-xs font-medium text-slate-500">
                     {event.time || "Time not specified"}
                   </div>
 
                   {event.location ? (
-                    <div className="mt-2 text-sm font-medium text-slate-700">
+                    <div className="mt-2 text-sm font-semibold text-slate-700">
                       {event.location}
                     </div>
                   ) : null}
 
                   {event.description ? (
-                    <div className="mt-3 text-sm leading-6 text-slate-600">
+                    <div className="mt-4 text-sm leading-6 text-slate-600">
                       {event.description}
                     </div>
                   ) : null}
 
-                  {(event.source || event.link) ? (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {event.source ? (
-                        <span className="text-xs text-slate-500">{event.source}</span>
-                      ) : null}
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {event.source ? (
+                      <span className="text-xs text-slate-500">{event.source}</span>
+                    ) : null}
 
-                      {event.link ? (
-                        <a
-                          href={event.link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-sky-700 hover:text-sky-800"
-                        >
-                          View event
-                        </a>
-                      ) : null}
-                    </div>
-                  ) : null}
+                    {event.location ? (
+                      <GoogleMapsButton
+                        place={event}
+                        className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
+                      />
+                    ) : null}
+
+                    {event.link ? (
+                      <a
+                        href={event.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
+                      >
+                        View event →
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1066,226 +981,107 @@ function EventsSection({ events }) {
   );
 }
 
-function WeatherSection({ state, destination, tripMode }) {
-  if (state.loading) {
-    return (
-      <Card className="overflow-hidden">
-        <CardHeader
-          title="Weather Preview"
-          subtitle={`Checking current conditions for ${destination || "your destination"}`}
-        />
-        <CardBody>
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-            <div className="h-36 animate-pulse rounded-3xl bg-slate-100" />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100" />
-              ))}
-            </div>
-          </div>
-        </CardBody>
-      </Card>
-    );
-  }
-
-  if (state.error || !state.data?.current) {
-    return null;
-  }
-
-  const current = state.data.current;
-  const daily = state.data.daily || {};
-  const days = Array.isArray(daily?.time)
-    ? daily.time.map((date, i) => ({
-      date,
-      weatherCode: daily?.weather_code?.[i],
-      max: daily?.temperature_2m_max?.[i],
-      min: daily?.temperature_2m_min?.[i],
-      rainChance: daily?.precipitation_probability_max?.[i],
-    }))
-    : [];
+function PlacesGallery({ points, loading }) {
+  if (!points?.length && !loading) return null;
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
-        title="Weather Preview"
-        subtitle={
-          tripMode === "multi"
-            ? `Current forecast for your first city: ${state.data?.name || destination || "destination"}`
-            : `Current forecast for ${state.data?.name || destination || "your destination"}`
+        title="Places from your itinerary"
+        subtitle="Photos based on your place names and locations"
+        right={
+          !loading ? (
+            <Badge className="bg-sky-50 text-sky-700">{points.length} places</Badge>
+          ) : null
         }
-        right={<Badge className="border-sky-200 bg-sky-50 text-sky-700">Live weather</Badge>}
       />
-      <CardBody className="space-y-4">
-        <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
-          <div className="rounded-[1.75rem] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-5">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-slate-500">Right now</div>
-                <div className="mt-2 flex items-center gap-3">
-                  <div className="text-4xl">{weatherCodeToEmoji(current.weather_code)}</div>
-                  <div>
-                    <div className="text-3xl font-black tracking-tight text-slate-900">
-                      {Math.round(current.temperature_2m)}°C
-                    </div>
-                    <div className="text-sm text-slate-600">
-                      {weatherCodeToLabel(current.weather_code)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:min-w-[220px] sm:grid-cols-2">
-                <MetricTile
-                  label="Feels like"
-                  value={`${Math.round(current.apparent_temperature)}°C`}
-                />
-                <MetricTile
-                  label="Wind"
-                  value={`${Math.round(current.wind_speed_10m)} km/h`}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {days.slice(0, 7).map((item, i) => (
-              <div
-                key={`${item.date}-${i}`}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  {i === 0 ? "Today" : dayName(item.date)}
-                </div>
-                <div className="mt-2 text-2xl">{weatherCodeToEmoji(item.weatherCode)}</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">
-                  {weatherCodeToLabel(item.weatherCode)}
-                </div>
-                <div className="mt-2 text-xs text-slate-600">
-                  {Math.round(item.max)}° / {Math.round(item.min)}°
-                </div>
-                <div className="mt-1 text-xs text-slate-500">
-                  Rain: {Number.isFinite(item.rainChance) ? `${item.rainChance}%` : "—"}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </CardBody>
-    </Card>
-  );
-}
-
-function MetricTile({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm">
-      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-        {label}
-      </div>
-      <div className="mt-1 text-sm font-semibold text-slate-900">{value}</div>
-    </div>
-  );
-}
-
-function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
-  const displayedPlaces =
-    enrichedPlaces.length > 0
-      ? enrichedPlaces
-      : places.map((p, index) => ({
-        id: `${p?.name || "place"}-${index}`,
-        name: p?.name || "Recommended Place",
-        reason: p?.reason || "",
-        category: p?.category || "",
-        location: p?.location || "",
-      }));
-
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader
-        title="Recommended Places & Attractions"
-        subtitle="Extra ideas, nearby highlights, and must-visit spots for this destination"
-        right={<Badge>{displayedPlaces.length} picks</Badge>}
-      />
-      <CardBody className="space-y-4">
-        {error ? <Alert type="error">{error}</Alert> : null}
-
-        {loading ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white"
-              >
-                <div className="h-44 animate-pulse bg-slate-100" />
-                <div className="space-y-3 p-4">
-                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
-                  <div className="h-3 w-full animate-pulse rounded bg-slate-100" />
-                  <div className="h-3 w-4/5 animate-pulse rounded bg-slate-100" />
-                </div>
-              </div>
-            ))}
-          </div>
+      <CardBody>
+        {loading && !points?.length ? (
+          <SoftMessage>Loading place photos...</SoftMessage>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {displayedPlaces.map((place, i) => (
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {points.map((place, i) => (
               <div
-                key={place.id || `${place.location}-${i}`}
-                className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md"
+                key={`${place.location}-${i}`}
+                className="group overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1.5 hover:shadow-xl"
               >
-                <div className="relative h-44 overflow-hidden bg-slate-100">
+                <div className="relative h-56 overflow-hidden bg-slate-100">
                   {place.photoUrl ? (
                     <img
                       src={place.photoUrl}
-                      alt={place.name || place.location}
+                      alt={place.title || place.location}
                       className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
                       No photo available
                     </div>
                   )}
 
-                  {place.category ? (
-                    <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white">
-                      {place.category}
-                    </div>
-                  ) : null}
+                  <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
+
+                  <div className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                    Day {place.day} • {place.timeBlock}
+                  </div>
                 </div>
 
-                <div className="space-y-3 p-4">
+                <div className="space-y-4 p-5">
                   <div>
-                    <div className="text-sm font-bold text-slate-900">
-                      {place.name || place.title || place.location}
+                    <div className="text-lg font-extrabold tracking-tight text-slate-900">
+                      {place.title || "Place"}
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {place.displayName || place.location}
-                    </div>
-                  </div>
 
-                  {place.reason ? (
-                    <div className="text-sm leading-6 text-slate-600">{place.reason}</div>
-                  ) : null}
+                    {place?.location ? (
+                      <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                        📍 {place.location}
+                      </div>
+                    ) : place?.address ? (
+                      <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                        📍 {place.address}
+                      </div>
+                    ) : null}
+                  </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {place.type ? (
-                      <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
-                        {place.type}
-                      </span>
+                    {place.durationHours ? (
+                      <Tag color="indigo">{formatHours(Number(place.durationHours))}</Tag>
                     ) : null}
-                    {place.category ? (
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                        {place.category}
-                      </span>
-                    ) : null}
+                    {place.category ? <Tag color="slate">{place.category}</Tag> : null}
+                    {place.type ? <Tag color="sky">{place.type}</Tag> : null}
                   </div>
 
-                  {place.address ? (
-                    <div className="text-xs leading-5 text-slate-500">{place.address}</div>
+                  {place.notes ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">
+                      {place.notes}
+                    </div>
                   ) : null}
+
+                  <div className="flex items-center justify-between gap-3">
+                    <GoogleMapsButton
+                      place={place}
+                      className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
+                    />
+                  </div>
 
                   {place.photoAttribution?.photographer ? (
                     <div className="text-[11px] text-slate-400">
-                      Photo by {place.photoAttribution.photographer}
+                      Photo by{" "}
+                      {place.photoAttribution?.photographerUrl ? (
+                        <a
+                          href={place.photoAttribution.photographerUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline transition hover:text-slate-500"
+                        >
+                          {place.photoAttribution.photographer}
+                        </a>
+                      ) : (
+                        place.photoAttribution.photographer
+                      )}
+                      {place.photoAttribution?.source
+                        ? ` on ${place.photoAttribution.source}`
+                        : ""}
                     </div>
                   ) : null}
                 </div>
@@ -1298,111 +1094,29 @@ function RecommendedPlacesSection({ places, enrichedPlaces, loading, error }) {
   );
 }
 
-function PlacesGallery({ points }) {
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader
-        title="Places from your itinerary"
-        subtitle="Photos and details for the locations in your saved trip"
-        right={<Badge>{points.length} places</Badge>}
-      />
-      <CardBody>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {points.map((place, i) => (
-            <div
-              key={`${place.location}-${i}`}
-              className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md"
-            >
-              <div className="relative h-44 overflow-hidden bg-slate-100">
-                {place.photoUrl ? (
-                  <img
-                    src={place.photoUrl}
-                    alt={place.title || place.location}
-                    className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                    No photo available
-                  </div>
-                )}
-
-                <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white">
-                  Day {place.day} • {place.timeBlock}
-                </div>
-              </div>
-
-              <div className="space-y-3 p-4">
-                <div>
-                  <div className="text-sm font-bold text-slate-900">
-                    {place.title || place.location}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {place.displayName || place.location}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {place.durationHours ? (
-                    <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">
-                      {formatHours(Number(place.durationHours))}
-                    </span>
-                  ) : null}
-
-                  {place.category ? (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                      {place.category}
-                    </span>
-                  ) : null}
-
-                  {place.type ? (
-                    <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
-                      {place.type}
-                    </span>
-                  ) : null}
-                </div>
-
-                {place.notes ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-                    {place.notes}
-                  </div>
-                ) : null}
-
-                {place.address ? (
-                  <div className="text-xs leading-5 text-slate-500">{place.address}</div>
-                ) : null}
-
-                {place.photoAttribution?.photographer ? (
-                  <div className="text-[11px] text-slate-400">
-                    Photo by {place.photoAttribution.photographer}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardBody>
-    </Card>
-  );
-}
-
 function DayCard({ day, isOpen, onToggle }) {
   const activityCount = countDayActivities(day);
   const totalHours = getDayEstimatedHours(day);
 
   return (
-    <Card id={`day-${day.day}`} className="overflow-hidden scroll-mt-28">
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-5 text-white">
-        <div className="flex items-start justify-between gap-3">
+    <Card
+      id={`day-${day.day}`}
+      className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur scroll-mt-28"
+    >
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-5 text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_20%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.16),transparent_24%)]" />
+        <div className="relative flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-white/75">
+            <div className="text-xs font-bold uppercase tracking-[0.25em] text-white/70">
               Day {day.day}
             </div>
-            <div className="mt-1 text-xl font-black leading-snug">{day.title}</div>
-            <div className="mt-1 text-sm text-white/80">{day.date}</div>
+            <div className="mt-2 text-2xl font-black tracking-tight leading-snug">
+              {day.title}
+            </div>
+            <div className="mt-2 text-sm text-white/80">{day.date}</div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Badge className="border-white/20 bg-white/10 text-white">
               {activityCount} activities
             </Badge>
@@ -1412,7 +1126,7 @@ function DayCard({ day, isOpen, onToggle }) {
             <Button
               type="button"
               variant="secondary"
-              className="bg-white/15 text-white hover:bg-white/20"
+              className="bg-white/15 text-white backdrop-blur hover:bg-white/20"
               onClick={onToggle}
             >
               {isOpen ? "Collapse" : "Expand"}
@@ -1422,18 +1136,26 @@ function DayCard({ day, isOpen, onToggle }) {
       </div>
 
       {isOpen ? (
-        <CardBody>
+        <CardBody className="space-y-1">
           <MiniSection title="Morning" items={day.morning} icon="☀️" />
           <MiniSection title="Afternoon" items={day.afternoon} icon="🌤️" />
           <MiniSection title="Evening" items={day.evening} icon="🌙" />
 
           {(day.foodSuggestion || day.backupPlan) && (
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
               {day.foodSuggestion ? (
-                <InfoTile label="Food Suggestion" value={clamp(day.foodSuggestion)} />
+                <FancyInfoTile
+                  label="Food Suggestion"
+                  value={clamp(day.foodSuggestion)}
+                  icon="🍽️"
+                />
               ) : null}
               {day.backupPlan ? (
-                <InfoTile label="Backup Plan" value={clamp(day.backupPlan)} />
+                <FancyInfoTile
+                  label="Backup Plan"
+                  value={clamp(day.backupPlan)}
+                  icon="🛟"
+                />
               ) : null}
             </div>
           )}
@@ -1445,66 +1167,39 @@ function DayCard({ day, isOpen, onToggle }) {
 
 function TripSkeleton() {
   return (
-    <div className="mx-auto max-w-5xl">
-      <Card>
+    <div className="mx-auto max-w-6xl px-4 py-6">
+      <Card className="overflow-hidden border border-slate-200 bg-white shadow-sm">
         <CardBody>
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-1/3 animate-pulse rounded bg-slate-200" />
-              <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 animate-pulse rounded-full bg-slate-200" />
+            <div className="flex-1 space-y-3">
+              <div className="h-5 w-1/3 animate-pulse rounded-full bg-slate-200" />
+              <div className="h-3 w-1/2 animate-pulse rounded-full bg-slate-100" />
             </div>
           </div>
-          <div className="mt-5 h-28 animate-pulse rounded-2xl bg-slate-100" />
+          <div className="mt-6 h-36 animate-pulse rounded-[1.5rem] bg-slate-100" />
         </CardBody>
       </Card>
     </div>
   );
 }
 
-function MapSkeleton() {
+function FancyInfoTile({ label, value, icon }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-slate-800">Finding locations…</div>
-          <div className="mt-1 text-xs text-slate-500">
-            Converting place names into coordinates.
+    <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-lg">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
+            {label}
+          </div>
+          <div className="mt-1 text-sm font-semibold leading-6 text-slate-800">
+            {value}
           </div>
         </div>
-        <div className="h-8 w-8 animate-pulse rounded-full bg-slate-200" />
       </div>
-      <div className="mt-4 h-48 animate-pulse rounded-2xl bg-slate-100" />
-    </div>
-  );
-}
-
-function NiceEmptyState({ title, subtitle, hint, action }) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-5">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-50">
-          <div className="h-4 w-4 rounded bg-sky-300" />
-        </div>
-
-        <div className="flex-1">
-          <div className="text-sm font-bold text-slate-900">{title}</div>
-          <div className="mt-1 text-sm text-slate-600">{subtitle}</div>
-          {hint ? <div className="mt-3 text-xs leading-relaxed text-slate-500">{hint}</div> : null}
-          {action ? <div className="mt-4">{action}</div> : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InfoTile({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
-        {label}
-      </div>
-      <div className="mt-1 text-sm leading-relaxed text-slate-800">{value}</div>
     </div>
   );
 }
@@ -1513,49 +1208,82 @@ function MiniSection({ title, items, icon }) {
   if (!items?.length) return null;
 
   return (
-    <div className="mt-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-          <span className="text-sm normal-case">{icon}</span>
+    <div className="mt-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+          <span className="text-base normal-case">{icon}</span>
           {title}
         </div>
-        <div className="text-[11px] text-slate-500">
+        <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
           {items.length} item{items.length > 1 ? "s" : ""}
         </div>
       </div>
 
-      <ul className="mt-2 space-y-2 text-sm text-slate-800">
+      <ul className="mt-3 space-y-3 text-sm text-slate-800">
         {items.map((x, i) => (
           <li
             key={x.id ?? `${x.title}-${x.location}-${i}`}
-            className="rounded-2xl border border-slate-200 bg-white px-3 py-3 transition hover:border-sky-200 hover:bg-sky-50/30"
+            className="rounded-[1.4rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <div className="font-semibold text-slate-900">{x.title}</div>
+                <div className="text-sm font-extrabold tracking-tight text-slate-900">
+                  {x.title}
+                </div>
 
                 {x.location ? (
-                  <div className="mt-0.5 text-xs text-slate-500">{x.location}</div>
+                  <div className="mt-1 text-xs text-slate-500">{x.location}</div>
                 ) : null}
 
                 {x.notes ? (
-                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2.5 text-xs leading-5 text-slate-600">
                     {x.notes}
+                  </div>
+                ) : null}
+
+                {x.location ? (
+                  <div className="mt-3">
+                    <GoogleMapsButton
+                      place={x}
+                      className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
+                    />
                   </div>
                 ) : null}
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {x.durationHours ? (
-                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700">
-                    {formatHours(Number(x.durationHours))}
-                  </span>
+                  <Tag color="indigo">{formatHours(Number(x.durationHours))}</Tag>
                 ) : null}
               </div>
             </div>
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function Tag({ children, color = "slate" }) {
+  const styles = {
+    slate: "bg-slate-100 text-slate-700",
+    sky: "bg-sky-100 text-sky-700",
+    indigo: "bg-indigo-100 text-indigo-700",
+  };
+
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ${styles[color] || styles.slate}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SoftMessage({ children }) {
+  return (
+    <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 text-sm text-slate-600">
+      {children}
     </div>
   );
 }
