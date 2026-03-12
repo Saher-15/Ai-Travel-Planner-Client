@@ -78,7 +78,7 @@ export default function Login() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+      <section className="relative overflow-hidden rounded-4xl border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
         <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
         <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
@@ -153,7 +153,7 @@ export default function Login() {
 
             <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
               <form onSubmit={onSubmit} className="space-y-6">
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-5">
                     <div className="text-lg font-bold text-slate-900">
                       Account details
@@ -199,7 +199,7 @@ export default function Login() {
                   </Link>
                 </div>
 
-                <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
                   Sign in to create trips, save itineraries, and manage your
                   travel plans from one place.
                 </div>
@@ -256,7 +256,7 @@ export default function Login() {
             />
 
             <CardBody className="bg-linear-to-b from-white to-slate-50/60">
-              <div className="rounded-[1.5rem] border border-sky-100 bg-linear-to-r from-sky-50 to-indigo-50 p-5">
+              <div className="rounded-3xl border border-sky-100 bg-linear-to-r from-sky-50 to-indigo-50 p-5">
                 <div className="text-base font-bold text-slate-900">
                   New here?
                 </div>
@@ -284,7 +284,7 @@ export default function Login() {
 
 function HeroStat({ title, value, subtitle }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+    <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
       <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
         {title}
       </div>
@@ -307,7 +307,7 @@ function MiniInfo({ title, text }) {
 
 function StepCard({ number, title, text }) {
   return (
-    <div className="flex gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-sm font-black text-white">
         {number}
       </div>

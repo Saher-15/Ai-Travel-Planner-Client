@@ -9,7 +9,6 @@ import {
   CardBody,
   CardHeader,
 } from "../components/UI.jsx";
-import RouteTripMap from "../components/RouteTripMap.jsx";
 
 const BLOCKS = ["morning", "afternoon", "evening"];
 const BLOCK_ORDER = { morning: 1, afternoon: 2, evening: 3 };
@@ -76,7 +75,6 @@ function extractUniqueLocations(itinerary, destination = "") {
             durationHours: a?.durationHours ?? null,
             type: a?.type || "",
             category: a?.category || "",
-            rating: a?.rating ?? null,
             image: a?.image || a?.imageUrl || a?.photo || a?.photoUrl || null,
             photoQuery: buildPhotoQuery(a, destination),
           }))
@@ -122,12 +120,6 @@ function formatHours(value) {
   if (!Number.isFinite(value) || value <= 0) return "—";
   if (Number.isInteger(value)) return `${value}h`;
   return `${value.toFixed(1)}h`;
-}
-
-function formatRating(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return "";
-  return n.toFixed(1);
 }
 
 function useAsync(fn, deps) {
@@ -204,7 +196,10 @@ function usePlacePhotos(places, destination = "") {
           item.location
       );
 
-      const match = results.find((r) => normalizeText(r?.query) === itemKey);
+const match = results.find((r) =>
+  normalizeText(r?.query) === itemKey ||
+  normalizeText(r?.matchedQuery) === itemKey
+);
 
       return {
         ...item,
@@ -335,33 +330,6 @@ export default function ViewTrip() {
     }));
   };
 
-  const openAllDays = () => {
-    const next = {};
-    (trip?.itinerary?.days || []).forEach((day) => {
-      next[day.day] = true;
-    });
-    setOpenDays(next);
-  };
-
-  const collapseAllDays = () => {
-    const next = {};
-    (trip?.itinerary?.days || []).forEach((day) => {
-      next[day.day] = false;
-    });
-    setOpenDays(next);
-  };
-
-  const handleJumpToDay = (dayNumber) => {
-    setOpenDays((prev) => ({
-      ...prev,
-      [dayNumber]: true,
-    }));
-
-    requestAnimationFrame(() => {
-      scrollToDay(dayNumber);
-    });
-  };
-
   const downloadPDF = async () => {
     setDownloadError("");
 
@@ -428,7 +396,7 @@ export default function ViewTrip() {
 
       <div
         ref={pdfRef}
-        className="space-y-8 rounded-[2rem] bg-gradient-to-b from-slate-50 via-white to-sky-50/40 p-1"
+        className="space-y-8 rounded-4xl bg-linear-to-b from-slate-50 via-white to-sky-50/40 p-1"
       >
         <Header
           trip={trip}
@@ -449,14 +417,7 @@ export default function ViewTrip() {
           totalActivities={totalActivities}
           totalHours={totalHours}
           placeCount={placeCount}
-        />
-
-        {!!tripMapPlaces.length && (
-          <RouteMapSection
-            places={tripMapPlaces}
-            destination={primaryDestination}
-          />
-        )}
+        />    
 
         <CityPlanSection
           summary={summary}
@@ -465,15 +426,6 @@ export default function ViewTrip() {
         />
 
         <EventsSection events={trip?.events || []} />
-
-        {!!trip?.itinerary?.days?.length && (
-          <DayNavigator
-            days={trip.itinerary.days}
-            openAll={openAllDays}
-            collapseAll={collapseAllDays}
-            onJump={handleJumpToDay}
-          />
-        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           {trip?.itinerary?.days?.map((d) => (
@@ -498,7 +450,7 @@ export default function ViewTrip() {
                 {trip.itinerary.tips.map((t, i) => (
                   <div
                     key={i}
-                    className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 text-sm leading-6 text-slate-700 shadow-sm"
+                    className="rounded-3xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-4 text-sm leading-6 text-slate-700 shadow-sm"
                   >
                     <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-sky-600">
                       Tip {i + 1}
@@ -518,7 +470,7 @@ export default function ViewTrip() {
 
         <RecommendedPlacesSection
           places={recommendedPlaces}
-          onJump={handleJumpToDay}
+          // onJump={handleJumpToDay}
           loading={recommendedPhotosState.loading}
         />
       </div>
@@ -539,7 +491,7 @@ function Header({
   return (
     <Card className="relative overflow-hidden border-0 shadow-[0_24px_80px_-28px_rgba(37,99,235,0.55)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.10),transparent_24%)]" />
-      <div className="relative bg-gradient-to-br from-sky-700 via-blue-700 to-indigo-900 text-white">
+      <div className="relative bg-linear-to-br from-sky-700 via-blue-700 to-indigo-900 text-white">
         <div className="flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.25em] text-white/85">
@@ -626,7 +578,7 @@ function Header({
 
           <Button
             type="button"
-            className="bg-white text-sky-800 shadow-lg hover:bg-sky-50"
+            className=" text-sky-800 shadow-lg hover:bg-sky-50"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -697,7 +649,7 @@ function TripOverview({
         </div>
 
         {tripMode === "multi" && destinations.length > 1 ? (
-          <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-r from-sky-50 to-indigo-50 p-5">
+          <div className="rounded-3xl border border-slate-200 bg-linear-to-r from-sky-50 to-indigo-50 p-5">
             <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
               Cities in this trip
             </div>
@@ -733,7 +685,7 @@ function TripOverview({
         )}
 
         {preferences?.notes ? (
-          <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm">
+          <div className="rounded-3xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-5 shadow-sm">
             <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
               Notes
             </div>
@@ -742,25 +694,6 @@ function TripOverview({
             </div>
           </div>
         ) : null}
-      </CardBody>
-    </Card>
-  );
-}
-
-function RouteMapSection({ places, destination }) {
-  return (
-    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
-      <CardHeader
-        title="Trip Route Map"
-        subtitle="Locations from your itinerary shown on a live map"
-      />
-      <CardBody>
-        <RouteTripMap
-          places={places}
-          destination={destination}
-          profile="driving"
-          height={430}
-        />
       </CardBody>
     </Card>
   );
@@ -784,7 +717,7 @@ function CityPlanSection({ summary, tripMode, destinations }) {
             {cityPlan.map((segment, index) => (
               <div
                 key={`${segment.city}-${index}`}
-                className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-indigo-50/60 p-5 shadow-sm"
+                className="rounded-3xl border border-slate-200 bg-linear-to-br from-white to-indigo-50/60 p-5 shadow-sm"
               >
                 <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
                   City {index + 1}
@@ -804,51 +737,6 @@ function CityPlanSection({ summary, tripMode, destinations }) {
         ) : (
           <SoftMessage>This is a multi-city trip with {destinations.length} cities.</SoftMessage>
         )}
-      </CardBody>
-    </Card>
-  );
-}
-
-function DayNavigator({ days, openAll, collapseAll, onJump }) {
-  return (
-    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
-      <CardHeader
-        title="Jump to a Day"
-        subtitle="Quick navigation for longer itineraries"
-        right={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              className="px-3 py-2 text-xs"
-              onClick={openAll}
-            >
-              Expand all
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="px-3 py-2 text-xs"
-              onClick={collapseAll}
-            >
-              Collapse all
-            </Button>
-          </div>
-        }
-      />
-      <CardBody>
-        <div className="flex flex-wrap gap-2.5">
-          {days.map((day) => (
-            <button
-              key={day.day}
-              type="button"
-              onClick={() => onJump?.(day.day)}
-              className="rounded-full border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
-            >
-              Day {day.day}
-            </button>
-          ))}
-        </div>
       </CardBody>
     </Card>
   );
@@ -898,7 +786,6 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
               const dayNumber = place?.day || place?.dayNumber || null;
               const category = place?.category || place?.type || "";
               const duration = place?.durationHours || place?.estimatedHours || null;
-              const rating = formatRating(place?.rating);
 
               return (
                 <div
@@ -914,12 +801,12 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
                         loading="lazy"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
+                      <div className="flex h-full items-center justify-center bg-linear-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
                         No photo available
                       </div>
                     )}
 
-                    <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-t from-black/55 to-transparent" />
 
                     {dayNumber ? (
                       <div className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
@@ -950,7 +837,6 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
                       {duration ? (
                         <Tag color="indigo">{formatHours(Number(duration))}</Tag>
                       ) : null}
-                      {rating ? <Tag color="slate">⭐ {rating}</Tag> : null}
                     </div>
 
                     {description ? (
@@ -981,28 +867,7 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
                           Go to Day {dayNumber}
                         </Button>
                       ) : null}
-                    </div>
-
-                    {place.photoAttribution?.photographer ? (
-                      <div className="text-[11px] text-slate-400">
-                        Photo by{" "}
-                        {place.photoAttribution?.photographerUrl ? (
-                          <a
-                            href={place.photoAttribution.photographerUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline transition hover:text-slate-500"
-                          >
-                            {place.photoAttribution.photographer}
-                          </a>
-                        ) : (
-                          place.photoAttribution.photographer
-                        )}
-                        {place.photoAttribution?.source
-                          ? ` on ${place.photoAttribution.source}`
-                          : ""}
-                      </div>
-                    ) : null}
+                    </div>              
                   </div>
                 </div>
               );
@@ -1044,7 +909,7 @@ function EventsSection({ events }) {
               {grouped[dateKey].map((event, i) => (
                 <div
                   key={`${event.name}-${event.date}-${i}`}
-                  className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                  className="rounded-3xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-base font-extrabold tracking-tight text-slate-900">
@@ -1129,7 +994,6 @@ function PlacesGallery({ points, loading }) {
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {points.map((place, i) => {
-              const rating = formatRating(place?.rating);
 
               return (
                 <div
@@ -1145,12 +1009,12 @@ function PlacesGallery({ points, loading }) {
                         loading="lazy"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
+                      <div className="flex h-full items-center justify-center bg-linear-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
                         No photo available
                       </div>
                     )}
 
-                    <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-t from-black/55 to-transparent" />
 
                     <div className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
                       Day {place.day} • {place.timeBlock}
@@ -1180,7 +1044,6 @@ function PlacesGallery({ points, loading }) {
                       ) : null}
                       {place.category ? <Tag color="slate">{place.category}</Tag> : null}
                       {place.type ? <Tag color="sky">{place.type}</Tag> : null}
-                      {rating ? <Tag color="slate">⭐ {rating}</Tag> : null}
                     </div>
 
                     {place.notes ? (
@@ -1200,28 +1063,7 @@ function PlacesGallery({ points, loading }) {
                         place={place}
                         className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
                       />
-                    </div>
-
-                    {place.photoAttribution?.photographer ? (
-                      <div className="text-[11px] text-slate-400">
-                        Photo by{" "}
-                        {place.photoAttribution?.photographerUrl ? (
-                          <a
-                            href={place.photoAttribution.photographerUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline transition hover:text-slate-500"
-                          >
-                            {place.photoAttribution.photographer}
-                          </a>
-                        ) : (
-                          place.photoAttribution.photographer
-                        )}
-                        {place.photoAttribution?.source
-                          ? ` on ${place.photoAttribution.source}`
-                          : ""}
-                      </div>
-                    ) : null}
+                    </div>  
                   </div>
                 </div>
               );
@@ -1233,30 +1075,16 @@ function PlacesGallery({ points, loading }) {
   );
 }
 
-function DayCard({ day, isOpen, onToggle, destination }) {
+function DayCard({ day, isOpen, onToggle }) {
   const activityCount = countDayActivities(day);
   const totalHours = getDayEstimatedHours(day);
-
-  const dayPlaces = useMemo(() => {
-    const items = [
-      ...(Array.isArray(day?.morning) ? day.morning : []),
-      ...(Array.isArray(day?.afternoon) ? day.afternoon : []),
-      ...(Array.isArray(day?.evening) ? day.evening : []),
-    ];
-
-    return items.map((item) => ({
-      title: item?.title,
-      location: item?.location,
-      address: item?.address,
-    }));
-  }, [day]);
 
   return (
     <Card
       id={`day-${day.day}`}
       className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur scroll-mt-28"
     >
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 p-5 text-white">
+      <div className="relative overflow-hidden bg-linear-to-br from-slate-900 via-slate-800 to-indigo-950 p-5 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_20%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.16),transparent_24%)]" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -1294,17 +1122,6 @@ function DayCard({ day, isOpen, onToggle, destination }) {
           <MiniSection title="Afternoon" items={day.afternoon} icon="🌤️" />
           <MiniSection title="Evening" items={day.evening} icon="🌙" />
 
-          {!!dayPlaces.length && (
-            <div className="mt-6">
-              <RouteTripMap
-                places={dayPlaces}
-                destination={destination}
-                profile="driving"
-                height={320}
-              />
-            </div>
-          )}
-
           {(day.foodSuggestion || day.backupPlan) && (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               {day.foodSuggestion ? (
@@ -1341,7 +1158,7 @@ function TripSkeleton() {
               <div className="h-3 w-1/2 animate-pulse rounded-full bg-slate-100" />
             </div>
           </div>
-          <div className="mt-6 h-36 animate-pulse rounded-[1.5rem] bg-slate-100" />
+          <div className="mt-6 h-36 animate-pulse rounded-3xl bg-slate-100" />
         </CardBody>
       </Card>
     </div>
@@ -1350,7 +1167,7 @@ function TripSkeleton() {
 
 function FancyInfoTile({ label, value, icon }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <div className="rounded-3xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-start gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-lg">
           {icon}
@@ -1385,12 +1202,11 @@ function MiniSection({ title, items, icon }) {
 
       <ul className="mt-3 space-y-3 text-sm text-slate-800">
         {items.map((x, i) => {
-          const rating = formatRating(x?.rating);
 
           return (
             <li
               key={x.id ?? `${x.title}-${x.address || x.location}-${i}`}
-              className="rounded-[1.4rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
+              className="rounded-[1.4rem] border border-slate-200 bg-linear-to-br from-white to-slate-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
@@ -1432,7 +1248,6 @@ function MiniSection({ title, items, icon }) {
                   ) : null}
                   {x.category ? <Tag color="slate">{x.category}</Tag> : null}
                   {x.type ? <Tag color="sky">{x.type}</Tag> : null}
-                  {rating ? <Tag color="slate">⭐ {rating}</Tag> : null}
                 </div>
               </div>
             </li>
@@ -1461,7 +1276,7 @@ function Tag({ children, color = "slate" }) {
 
 function SoftMessage({ children }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 text-sm text-slate-600">
+    <div className="rounded-3xl border border-slate-200 bg-linear-to-br from-slate-50 to-white p-4 text-sm text-slate-600">
       {children}
     </div>
   );

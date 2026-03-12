@@ -71,7 +71,7 @@ export default function MyTrips() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+      <section className="relative overflow-hidden rounded-4xl border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
         <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
         <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
@@ -351,7 +351,7 @@ function TripsSkeleton() {
 
 function HeroStat({ title, value, subtitle }) {
   return (
-    <div className="rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+    <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
       <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
         {title}
       </div>

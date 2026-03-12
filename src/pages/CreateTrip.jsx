@@ -538,7 +538,7 @@ export default function CreateTrip() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+      <section className="relative overflow-hidden rounded-4xl border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
         <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
         <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
@@ -578,7 +578,7 @@ export default function CreateTrip() {
               />
             </div>
 
-            <div className="mt-6 rounded-[1.5rem] border border-sky-100 bg-white/80 p-4 shadow-sm">
+            <div className="mt-6 rounded-3xl border border-sky-100 bg-white/80 p-4 shadow-sm">
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
                 Trip summary
               </div>
@@ -998,7 +998,7 @@ export default function CreateTrip() {
 
                 {err ? <Alert type="error">{err}</Alert> : null}
 
-                <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                   When you click <b>Generate &amp; Save</b>, your AI itinerary is
                   created and saved directly to your account.
                 </div>
@@ -1130,7 +1130,7 @@ export default function CreateTrip() {
               </div>
 
               {tripMode === "multi" && multiCityPlaces.length ? (
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="text-sm font-bold text-slate-900">
                       Cities in this trip
@@ -1164,7 +1164,7 @@ export default function CreateTrip() {
               )}
 
               {includeEvents ? (
-                <div className="rounded-[1.5rem] border border-indigo-100 bg-linear-to-r from-indigo-50 to-sky-50 p-4 text-sm text-slate-600">
+                <div className="rounded-3xl border border-indigo-100 bg-linear-to-r from-indigo-50 to-sky-50 p-4 text-sm text-slate-600">
                   <div className="mb-1 font-bold text-slate-900">
                     Events enabled
                   </div>
@@ -1174,13 +1174,13 @@ export default function CreateTrip() {
               ) : null}
 
               {notes.trim() ? (
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+                <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
                   <div className="mb-2 font-bold text-slate-900">Trip notes</div>
                   {notes.trim()}
                 </div>
               ) : null}
 
-              <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 Preview your trip settings here before generating the final
                 itinerary.
               </div>
@@ -1209,11 +1209,11 @@ export default function CreateTrip() {
             />
 
             <CardBody className="space-y-4 bg-linear-to-b from-white to-slate-50/60">
-              <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 shadow-sm">
+              <div className="overflow-hidden rounded-3xl border border-slate-200 shadow-sm">
                 <MapTilerMap query={mapQuery} height={400} />
               </div>
 
-              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
                 {tripMode === "multi"
                   ? "For multi-city trips, the map previews your first city before generation."
                   : "Use the live map to confirm your destination before generating the full itinerary."}
@@ -1233,7 +1233,7 @@ function SectionBlock({ title, subtitle, right, children, tone = "default" }) {
       : "border-slate-200 bg-white";
 
   return (
-    <section className={`rounded-[1.5rem] border p-4 shadow-sm ${toneClass}`}>
+    <section className={`rounded-3xl border p-4 shadow-sm ${toneClass}`}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-sm font-bold text-slate-900">{title}</div>
@@ -1314,7 +1314,7 @@ function TravelerRow({
           −
         </button>
 
-        <div className="min-w-[2.5rem] text-center text-lg font-black text-slate-900">
+        <div className="min-w-10 text-center text-lg font-black text-slate-900">
           {value}
         </div>
 
@@ -1371,7 +1371,7 @@ function GlassPill({ children, className = "" }) {
 
 function PreviewCard({ title, text }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="text-sm font-bold text-slate-900">{title}</div>
       <div className="mt-1.5 text-sm leading-6 text-slate-600">{text}</div>
     </div>
