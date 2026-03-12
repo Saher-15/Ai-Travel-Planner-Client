@@ -9,6 +9,7 @@ import {
   CardBody,
   CardHeader,
 } from "../components/UI.jsx";
+import RouteTripMap from "../components/RouteTripMap.jsx";
 
 const BLOCKS = ["morning", "afternoon", "evening"];
 const BLOCK_ORDER = { morning: 1, afternoon: 2, evening: 3 };
@@ -45,13 +46,13 @@ function getRecommendedPlaces(trip) {
   return [];
 }
 
-function buildPhotoQuery(activity = {}, destination = "") {
+function buildPhotoQuery(item = {}, destination = "") {
   return [
-    activity?.title,
-    activity?.name,
-    activity?.placeName,
-    activity?.location,
-    activity?.address,
+    item?.title,
+    item?.name,
+    item?.placeName,
+    item?.location,
+    item?.address,
     destination,
   ]
     .filter(Boolean)
@@ -70,20 +71,23 @@ function extractUniqueLocations(itinerary, destination = "") {
             title: a?.title || "Place",
             timeBlock: block,
             location: (a?.location || "").trim(),
+            address: (a?.address || "").trim(),
             notes: a?.notes || "",
             durationHours: a?.durationHours ?? null,
             type: a?.type || "",
             category: a?.category || "",
-            address: a?.address || "",
+            rating: a?.rating ?? null,
             image: a?.image || a?.imageUrl || a?.photo || a?.photoUrl || null,
             photoQuery: buildPhotoQuery(a, destination),
           }))
-          .filter((x) => x.location)
+          .filter((x) => x.location || x.address || x.title)
       )
     ) ?? [];
 
   const unique = Array.from(
-    new Map(rows.map((x) => [normalizeText(x.location), x])).values()
+    new Map(
+      rows.map((x) => [normalizeText(x.address || x.location || x.title), x])
+    ).values()
   );
 
   return unique.sort(
@@ -118,6 +122,12 @@ function formatHours(value) {
   if (!Number.isFinite(value) || value <= 0) return "—";
   if (Number.isInteger(value)) return `${value}h`;
   return `${value.toFixed(1)}h`;
+}
+
+function formatRating(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return n.toFixed(1);
 }
 
 function useAsync(fn, deps) {
@@ -172,6 +182,7 @@ function usePlacePhotos(places, destination = "") {
         item.name ||
         item.placeName ||
         item.location ||
+        item.address ||
         "",
       title: item.title || item.name || item.placeName || "",
       location: item.location || "",
@@ -185,11 +196,12 @@ function usePlacePhotos(places, destination = "") {
     return stablePlaces.map((item) => {
       const itemKey = normalizeText(
         item.photoQuery ||
-        buildPhotoQuery(item, destination) ||
-        item.title ||
-        item.name ||
-        item.placeName ||
-        item.location
+          buildPhotoQuery(item, destination) ||
+          item.title ||
+          item.name ||
+          item.placeName ||
+          item.address ||
+          item.location
       );
 
       const match = results.find((r) => normalizeText(r?.query) === itemKey);
@@ -217,12 +229,12 @@ function scrollToDay(dayNumber) {
 
 function buildGoogleMapsUrl(place) {
   const query =
-    place?.address ||
-    place?.location ||
-    place?.title ||
-    place?.name ||
-    place?.placeName ||
-    "";
+    place?.address?.trim() ||
+    place?.location?.trim() ||
+    [place?.title || place?.name || place?.placeName, place?.destination]
+      .filter(Boolean)
+      .join(", ")
+      .trim();
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
@@ -279,6 +291,8 @@ export default function ViewTrip() {
     () =>
       rawRecommendedPlaces.map((place) => ({
         ...place,
+        title: place?.title || place?.name || "Recommended Place",
+        notes: place?.notes || place?.reason || "",
         photoQuery: buildPhotoQuery(place, primaryDestination),
       })),
     [rawRecommendedPlaces, primaryDestination]
@@ -306,6 +320,14 @@ export default function ViewTrip() {
 
   const placeCount = useMemo(() => locations.length || 0, [locations]);
 
+  const tripMapPlaces = useMemo(() => {
+    return locations.map((item) => ({
+      title: item.title,
+      location: item.location,
+      address: item.address,
+    }));
+  }, [locations]);
+
   const toggleDay = (dayNumber) => {
     setOpenDays((prev) => ({
       ...prev,
@@ -329,7 +351,16 @@ export default function ViewTrip() {
     setOpenDays(next);
   };
 
+  const handleJumpToDay = (dayNumber) => {
+    setOpenDays((prev) => ({
+      ...prev,
+      [dayNumber]: true,
+    }));
 
+    requestAnimationFrame(() => {
+      scrollToDay(dayNumber);
+    });
+  };
 
   const downloadPDF = async () => {
     setDownloadError("");
@@ -420,6 +451,13 @@ export default function ViewTrip() {
           placeCount={placeCount}
         />
 
+        {!!tripMapPlaces.length && (
+          <RouteMapSection
+            places={tripMapPlaces}
+            destination={primaryDestination}
+          />
+        )}
+
         <CityPlanSection
           summary={summary}
           tripMode={tripMode}
@@ -428,9 +466,14 @@ export default function ViewTrip() {
 
         <EventsSection events={trip?.events || []} />
 
-        
-
-
+        {!!trip?.itinerary?.days?.length && (
+          <DayNavigator
+            days={trip.itinerary.days}
+            openAll={openAllDays}
+            collapseAll={collapseAllDays}
+            onJump={handleJumpToDay}
+          />
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           {trip?.itinerary?.days?.map((d) => (
@@ -439,6 +482,7 @@ export default function ViewTrip() {
               day={d}
               isOpen={Boolean(openDays[d.day])}
               onToggle={() => toggleDay(d.day)}
+              destination={primaryDestination}
             />
           ))}
         </div>
@@ -474,6 +518,7 @@ export default function ViewTrip() {
 
         <RecommendedPlacesSection
           places={recommendedPlaces}
+          onJump={handleJumpToDay}
           loading={recommendedPhotosState.loading}
         />
       </div>
@@ -702,6 +747,25 @@ function TripOverview({
   );
 }
 
+function RouteMapSection({ places, destination }) {
+  return (
+    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
+      <CardHeader
+        title="Trip Route Map"
+        subtitle="Locations from your itinerary shown on a live map"
+      />
+      <CardBody>
+        <RouteTripMap
+          places={places}
+          destination={destination}
+          profile="driving"
+          height={430}
+        />
+      </CardBody>
+    </Card>
+  );
+}
+
 function CityPlanSection({ summary, tripMode, destinations }) {
   const cityPlan = Array.isArray(summary?.cityPlan) ? summary.cityPlan : [];
 
@@ -745,8 +809,52 @@ function CityPlanSection({ summary, tripMode, destinations }) {
   );
 }
 
+function DayNavigator({ days, openAll, collapseAll, onJump }) {
+  return (
+    <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
+      <CardHeader
+        title="Jump to a Day"
+        subtitle="Quick navigation for longer itineraries"
+        right={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="px-3 py-2 text-xs"
+              onClick={openAll}
+            >
+              Expand all
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="px-3 py-2 text-xs"
+              onClick={collapseAll}
+            >
+              Collapse all
+            </Button>
+          </div>
+        }
+      />
+      <CardBody>
+        <div className="flex flex-wrap gap-2.5">
+          {days.map((day) => (
+            <button
+              key={day.day}
+              type="button"
+              onClick={() => onJump?.(day.day)}
+              className="rounded-full border border-slate-200 bg-gradient-to-r from-white to-slate-50 px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
+            >
+              Day {day.day}
+            </button>
+          ))}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
 
-function RecommendedPlacesSection({ places, loading }) {
+function RecommendedPlacesSection({ places, onJump, loading }) {
   if (!places?.length && !loading) return null;
 
   return (
@@ -773,9 +881,6 @@ function RecommendedPlacesSection({ places, loading }) {
                 place?.location ||
                 "Recommended Place";
 
-              const subtitle =
-                place?.location || place?.displayName || place?.address || "";
-
               const image =
                 place?.photoUrl ||
                 place?.image ||
@@ -786,12 +891,14 @@ function RecommendedPlacesSection({ places, loading }) {
               const description =
                 place?.description ||
                 place?.notes ||
+                place?.reason ||
                 place?.summary ||
                 "";
 
               const dayNumber = place?.day || place?.dayNumber || null;
               const category = place?.category || place?.type || "";
               const duration = place?.durationHours || place?.estimatedHours || null;
+              const rating = formatRating(place?.rating);
 
               return (
                 <div
@@ -838,7 +945,13 @@ function RecommendedPlacesSection({ places, loading }) {
                       ) : null}
                     </div>
 
-                    
+                    <div className="flex flex-wrap gap-2">
+                      {category ? <Tag color="sky">{category}</Tag> : null}
+                      {duration ? (
+                        <Tag color="indigo">{formatHours(Number(duration))}</Tag>
+                      ) : null}
+                      {rating ? <Tag color="slate">⭐ {rating}</Tag> : null}
+                    </div>
 
                     {description ? (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">
@@ -858,7 +971,16 @@ function RecommendedPlacesSection({ places, loading }) {
                         className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
                       />
 
-
+                      {dayNumber ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="text-xs"
+                          onClick={() => onJump?.(dayNumber)}
+                        >
+                          Go to Day {dayNumber}
+                        </Button>
+                      ) : null}
                     </div>
 
                     {place.photoAttribution?.photographer ? (
@@ -942,6 +1064,12 @@ function EventsSection({ events }) {
                     </div>
                   ) : null}
 
+                  {event.address ? (
+                    <div className="mt-2 text-xs leading-5 text-slate-500">
+                      {event.address}
+                    </div>
+                  ) : null}
+
                   {event.description ? (
                     <div className="mt-4 text-sm leading-6 text-slate-600">
                       {event.description}
@@ -953,7 +1081,7 @@ function EventsSection({ events }) {
                       <span className="text-xs text-slate-500">{event.source}</span>
                     ) : null}
 
-                    {event.location ? (
+                    {(event.location || event.address) ? (
                       <GoogleMapsButton
                         place={event}
                         className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
@@ -988,7 +1116,7 @@ function PlacesGallery({ points, loading }) {
     <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
         title="Places from your itinerary"
-        subtitle="Photos based on your place names and locations"
+        subtitle="Places from your itinerary with photos and locations"
         right={
           !loading ? (
             <Badge className="bg-sky-50 text-sky-700">{points.length} places</Badge>
@@ -1000,93 +1128,104 @@ function PlacesGallery({ points, loading }) {
           <SoftMessage>Loading place photos...</SoftMessage>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {points.map((place, i) => (
-              <div
-                key={`${place.location}-${i}`}
-                className="group overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1.5 hover:shadow-xl"
-              >
-                <div className="relative h-56 overflow-hidden bg-slate-100">
-                  {place.photoUrl ? (
-                    <img
-                      src={place.photoUrl}
-                      alt={place.title || place.location}
-                      className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
-                      No photo available
-                    </div>
-                  )}
+            {points.map((place, i) => {
+              const rating = formatRating(place?.rating);
 
-                  <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
-
-                  <div className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
-                    Day {place.day} • {place.timeBlock}
-                  </div>
-                </div>
-
-                <div className="space-y-4 p-5">
-                  <div>
-                    <div className="text-lg font-extrabold tracking-tight text-slate-900">
-                      {place.title || "Place"}
-                    </div>
-
-                    {place?.location ? (
-                      <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
-                        📍 {place.location}
+              return (
+                <div
+                  key={`${place.address || place.location || place.title}-${i}`}
+                  className="group overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1.5 hover:shadow-xl"
+                >
+                  <div className="relative h-56 overflow-hidden bg-slate-100">
+                    {place.photoUrl ? (
+                      <img
+                        src={place.photoUrl}
+                        alt={place.title || place.location}
+                        className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
+                        No photo available
                       </div>
-                    ) : place?.address ? (
-                      <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
-                        📍 {place.address}
+                    )}
+
+                    <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/55 to-transparent" />
+
+                    <div className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                      Day {place.day} • {place.timeBlock}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 p-5">
+                    <div>
+                      <div className="text-lg font-extrabold tracking-tight text-slate-900">
+                        {place.title || "Place"}
+                      </div>
+
+                      {place?.location ? (
+                        <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                          📍 {place.location}
+                        </div>
+                      ) : place?.address ? (
+                        <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                          📍 {place.address}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {place.durationHours ? (
+                        <Tag color="indigo">{formatHours(Number(place.durationHours))}</Tag>
+                      ) : null}
+                      {place.category ? <Tag color="slate">{place.category}</Tag> : null}
+                      {place.type ? <Tag color="sky">{place.type}</Tag> : null}
+                      {rating ? <Tag color="slate">⭐ {rating}</Tag> : null}
+                    </div>
+
+                    {place.notes ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">
+                        {place.notes}
+                      </div>
+                    ) : null}
+
+                    {place.address ? (
+                      <div className="text-xs leading-5 text-slate-500">
+                        {place.address}
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-center justify-between gap-3">
+                      <GoogleMapsButton
+                        place={place}
+                        className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
+                      />
+                    </div>
+
+                    {place.photoAttribution?.photographer ? (
+                      <div className="text-[11px] text-slate-400">
+                        Photo by{" "}
+                        {place.photoAttribution?.photographerUrl ? (
+                          <a
+                            href={place.photoAttribution.photographerUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline transition hover:text-slate-500"
+                          >
+                            {place.photoAttribution.photographer}
+                          </a>
+                        ) : (
+                          place.photoAttribution.photographer
+                        )}
+                        {place.photoAttribution?.source
+                          ? ` on ${place.photoAttribution.source}`
+                          : ""}
                       </div>
                     ) : null}
                   </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {place.durationHours ? (
-                      <Tag color="indigo">{formatHours(Number(place.durationHours))}</Tag>
-                    ) : null}
-                    {place.category ? <Tag color="slate">{place.category}</Tag> : null}
-                    {place.type ? <Tag color="sky">{place.type}</Tag> : null}
-                  </div>
-
-                  {place.notes ? (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600">
-                      {place.notes}
-                    </div>
-                  ) : null}
-
-                  <div className="flex items-center justify-between gap-3">
-                    <GoogleMapsButton
-                      place={place}
-                      className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
-                    />
-                  </div>
-
-                  {place.photoAttribution?.photographer ? (
-                    <div className="text-[11px] text-slate-400">
-                      Photo by{" "}
-                      {place.photoAttribution?.photographerUrl ? (
-                        <a
-                          href={place.photoAttribution.photographerUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="underline transition hover:text-slate-500"
-                        >
-                          {place.photoAttribution.photographer}
-                        </a>
-                      ) : (
-                        place.photoAttribution.photographer
-                      )}
-                      {place.photoAttribution?.source
-                        ? ` on ${place.photoAttribution.source}`
-                        : ""}
-                    </div>
-                  ) : null}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardBody>
@@ -1094,9 +1233,23 @@ function PlacesGallery({ points, loading }) {
   );
 }
 
-function DayCard({ day, isOpen, onToggle }) {
+function DayCard({ day, isOpen, onToggle, destination }) {
   const activityCount = countDayActivities(day);
   const totalHours = getDayEstimatedHours(day);
+
+  const dayPlaces = useMemo(() => {
+    const items = [
+      ...(Array.isArray(day?.morning) ? day.morning : []),
+      ...(Array.isArray(day?.afternoon) ? day.afternoon : []),
+      ...(Array.isArray(day?.evening) ? day.evening : []),
+    ];
+
+    return items.map((item) => ({
+      title: item?.title,
+      location: item?.location,
+      address: item?.address,
+    }));
+  }, [day]);
 
   return (
     <Card
@@ -1140,6 +1293,17 @@ function DayCard({ day, isOpen, onToggle }) {
           <MiniSection title="Morning" items={day.morning} icon="☀️" />
           <MiniSection title="Afternoon" items={day.afternoon} icon="🌤️" />
           <MiniSection title="Evening" items={day.evening} icon="🌙" />
+
+          {!!dayPlaces.length && (
+            <div className="mt-6">
+              <RouteTripMap
+                places={dayPlaces}
+                destination={destination}
+                profile="driving"
+                height={320}
+              />
+            </div>
+          )}
 
           {(day.foodSuggestion || day.backupPlan) && (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -1220,45 +1384,60 @@ function MiniSection({ title, items, icon }) {
       </div>
 
       <ul className="mt-3 space-y-3 text-sm text-slate-800">
-        {items.map((x, i) => (
-          <li
-            key={x.id ?? `${x.title}-${x.location}-${i}`}
-            className="rounded-[1.4rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-extrabold tracking-tight text-slate-900">
-                  {x.title}
+        {items.map((x, i) => {
+          const rating = formatRating(x?.rating);
+
+          return (
+            <li
+              key={x.id ?? `${x.title}-${x.address || x.location}-${i}`}
+              className="rounded-[1.4rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 px-4 py-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-extrabold tracking-tight text-slate-900">
+                    {x.title}
+                  </div>
+
+                  {x.location ? (
+                    <div className="mt-2 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                      📍 {x.location}
+                    </div>
+                  ) : null}
+
+                  {x.address ? (
+                    <div className="mt-2 text-xs leading-5 text-slate-500">
+                      {x.address}
+                    </div>
+                  ) : null}
+
+                  {x.notes ? (
+                    <div className="mt-3 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2.5 text-xs leading-5 text-slate-600">
+                      {x.notes}
+                    </div>
+                  ) : null}
+
+                  {(x.location || x.address) ? (
+                    <div className="mt-3">
+                      <GoogleMapsButton
+                        place={x}
+                        className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
+                      />
+                    </div>
+                  ) : null}
                 </div>
 
-                {x.location ? (
-                  <div className="mt-1 text-xs text-slate-500">{x.location}</div>
-                ) : null}
-
-                {x.notes ? (
-                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2.5 text-xs leading-5 text-slate-600">
-                    {x.notes}
-                  </div>
-                ) : null}
-
-                {x.location ? (
-                  <div className="mt-3">
-                    <GoogleMapsButton
-                      place={x}
-                      className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
-                    />
-                  </div>
-                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {x.durationHours ? (
+                    <Tag color="indigo">{formatHours(Number(x.durationHours))}</Tag>
+                  ) : null}
+                  {x.category ? <Tag color="slate">{x.category}</Tag> : null}
+                  {x.type ? <Tag color="sky">{x.type}</Tag> : null}
+                  {rating ? <Tag color="slate">⭐ {rating}</Tag> : null}
+                </div>
               </div>
-
-              <div className="flex flex-wrap gap-2">
-                {x.durationHours ? (
-                  <Tag color="indigo">{formatHours(Number(x.durationHours))}</Tag>
-                ) : null}
-              </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
