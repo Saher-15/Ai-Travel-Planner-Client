@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  LogOut,
+  MailCheck,
+  MessageSquareText,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { api } from "../api/client";
 import {
@@ -22,18 +33,73 @@ function truncateText(text, max = 60) {
   return str.length > max ? `${str.slice(0, max)}...` : str;
 }
 
+function PasswordField({
+  label,
+  value,
+  onChange,
+  show,
+  onToggle,
+  placeholder,
+  autoComplete = "current-password",
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-semibold text-slate-700">{label}</label>
+
+      <div className="relative">
+        <input
+          type={show ? "text" : "password"}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          autoComplete={autoComplete}
+          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+        />
+
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={show ? `Hide ${label}` : `Show ${label}`}
+          className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-sky-600"
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Requirement({ ok, text }) {
+  return (
+    <div
+      className={`rounded-2xl border px-3 py-2 text-sm transition ${
+        ok
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-slate-200 bg-white text-slate-600"
+      }`}
+    >
+      {text}
+    </div>
+  );
+}
+
 const SUPPORT_PAGE_SIZE = 6;
 
 export default function Profile() {
-    useEffect(() => {
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
   const nav = useNavigate();
   const { user, logout } = useAuth();
 
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const [msg, setMsg] = useState(null);
 
   const [supportItems, setSupportItems] = useState([]);
@@ -56,6 +122,29 @@ export default function Profile() {
       pw
     );
   }
+
+  const passwordChecks = useMemo(() => {
+    return {
+      minLength: newPassword.length >= 8,
+      upper: /[A-Z]/.test(newPassword),
+      lower: /[a-z]/.test(newPassword),
+      number: /\d/.test(newPassword),
+      special: /[@$!%*?&]/.test(newPassword),
+      matches:
+        newPassword.length > 0 &&
+        confirmPassword.length > 0 &&
+        newPassword === confirmPassword,
+    };
+  }, [newPassword, confirmPassword]);
+
+  const canChangePassword = useMemo(() => {
+    return (
+      !passwordLoading &&
+      oldPassword.trim().length > 0 &&
+      newPassword.trim().length > 0 &&
+      confirmPassword.trim().length > 0
+    );
+  }, [oldPassword, newPassword, confirmPassword, passwordLoading]);
 
   async function loadMySupportMessages() {
     setSupportLoading(true);
@@ -123,6 +212,8 @@ export default function Profile() {
       return;
     }
 
+    setPasswordLoading(true);
+
     try {
       await api.post("/auth/change-password", {
         oldPassword,
@@ -132,10 +223,15 @@ export default function Profile() {
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setShowOldPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
 
       showMessage("Password changed successfully.");
     } catch (err) {
-      showMessage(err.response?.data?.message || "Password change failed.", "error");
+      showMessage(err?.response?.data?.message || "Password change failed.", "error");
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -144,7 +240,7 @@ export default function Profile() {
       const { data } = await api.post("/auth/resend-verification");
       showMessage(data.message || "Verification email sent.");
     } catch (err) {
-      showMessage(err.response?.data?.message || "Failed to resend email.", "error");
+      showMessage(err?.response?.data?.message || "Failed to resend email.", "error");
     }
   };
 
@@ -155,6 +251,9 @@ export default function Profile() {
 
   const repliedCount = supportItems.filter((item) => item.status === "replied").length;
   const pendingCount = supportItems.filter((item) => item.status === "pending").length;
+  const unreadRepliesCount = supportItems.filter(
+    (item) => item.status === "replied" && item.adminReply && item.userReplySeen === false
+  ).length;
 
   const filteredSupportItems = useMemo(() => {
     const q = supportQuery.trim().toLowerCase();
@@ -226,7 +325,7 @@ export default function Profile() {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
-        <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-indigo-50" />
         <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
 
@@ -248,16 +347,19 @@ export default function Profile() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <HeroStat
+                icon={<MessageSquareText size={18} />}
                 title="Support messages"
                 value={supportItems.length}
                 subtitle="Total conversations"
               />
               <HeroStat
+                icon={<MailCheck size={18} />}
                 title="Replies received"
                 value={repliedCount}
                 subtitle="Admin responses"
               />
               <HeroStat
+                icon={<AlertTriangle size={18} />}
                 title="Pending"
                 value={pendingCount}
                 subtitle="Waiting for reply"
@@ -268,7 +370,7 @@ export default function Profile() {
           <div className="lg:col-span-4">
             <div className="rounded-[1.75rem] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur">
               <div className="flex items-center gap-4">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-lg font-black text-white shadow-lg">
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-lg font-black text-white shadow-lg">
                   {(user?.name || "T").trim().charAt(0).toUpperCase()}
                 </div>
 
@@ -312,7 +414,7 @@ export default function Profile() {
               subtitle="Your main account details and email verification"
             />
 
-            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               {msg ? (
                 <Alert type={msg.type === "error" ? "error" : "success"}>
                   {msg.text}
@@ -320,7 +422,7 @@ export default function Profile() {
               ) : null}
 
               {!user?.verified && (
-                <div className="rounded-[1.5rem] border border-amber-200 bg-linear-to-r from-amber-50 to-yellow-50 p-5">
+                <div className="rounded-[1.5rem] border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-base font-bold text-amber-900">
@@ -385,30 +487,36 @@ export default function Profile() {
               subtitle="Keep your account secure with a stronger password"
             />
 
-            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               <div className="grid gap-4">
-                <Input
+                <PasswordField
                   label="Current Password"
-                  type="password"
-                  placeholder="Enter your current password"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
+                  show={showOldPassword}
+                  onToggle={() => setShowOldPassword((prev) => !prev)}
+                  placeholder="Enter your current password"
+                  autoComplete="current-password"
                 />
 
-                <Input
+                <PasswordField
                   label="New Password"
-                  type="password"
-                  placeholder="Enter your new password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
+                  show={showNewPassword}
+                  onToggle={() => setShowNewPassword((prev) => !prev)}
+                  placeholder="Enter your new password"
+                  autoComplete="new-password"
                 />
 
-                <Input
+                <PasswordField
                   label="Confirm New Password"
-                  type="password"
-                  placeholder="Confirm your new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  show={showConfirmPassword}
+                  onToggle={() => setShowConfirmPassword((prev) => !prev)}
+                  placeholder="Confirm your new password"
+                  autoComplete="new-password"
                 />
               </div>
 
@@ -416,12 +524,32 @@ export default function Profile() {
                 <div className="text-sm font-bold text-slate-800">
                   Password requirements
                 </div>
-                <div className="mt-2 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                  <div>• At least 8 characters</div>
-                  <div>• One uppercase letter</div>
-                  <div>• One lowercase letter</div>
-                  <div>• One number</div>
-                  <div>• One special character</div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <Requirement
+                    ok={passwordChecks.minLength}
+                    text="At least 8 characters"
+                  />
+                  <Requirement
+                    ok={passwordChecks.upper}
+                    text="One uppercase letter"
+                  />
+                  <Requirement
+                    ok={passwordChecks.lower}
+                    text="One lowercase letter"
+                  />
+                  <Requirement
+                    ok={passwordChecks.number}
+                    text="One number"
+                  />
+                  <Requirement
+                    ok={passwordChecks.special}
+                    text="One special character"
+                  />
+                  <Requirement
+                    ok={passwordChecks.matches}
+                    text="Passwords match"
+                  />
                 </div>
               </div>
 
@@ -430,8 +558,12 @@ export default function Profile() {
                   Update your password regularly to keep your account safe.
                 </div>
 
-                <Button variant="primary" onClick={onChangePassword}>
-                  Update Password
+                <Button
+                  variant="primary"
+                  onClick={onChangePassword}
+                  disabled={!canChangePassword}
+                >
+                  {passwordLoading ? "Updating..." : "Update Password"}
                 </Button>
               </div>
             </CardBody>
@@ -448,13 +580,15 @@ export default function Profile() {
                   variant="secondary"
                   onClick={loadMySupportMessages}
                   disabled={supportLoading}
+                  className="inline-flex items-center gap-2"
                 >
+                  <RefreshCw size={16} />
                   Refresh
                 </Button>
               }
             />
 
-            <CardBody className="space-y-4 bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="space-y-4 bg-gradient-to-b from-white to-slate-50/60">
               {supportError ? <Alert type="error">{supportError}</Alert> : null}
 
               {supportLoading ? (
@@ -506,15 +640,27 @@ export default function Profile() {
 
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
                     <div className="text-slate-600">
-                      Showing <span className="font-bold text-slate-900">{pagedSupportItems.length}</span> of{" "}
-                      <span className="font-bold text-slate-900">{filteredSupportItems.length}</span> messages
+                      Showing{" "}
+                      <span className="font-bold text-slate-900">
+                        {pagedSupportItems.length}
+                      </span>{" "}
+                      of{" "}
+                      <span className="font-bold text-slate-900">
+                        {filteredSupportItems.length}
+                      </span>{" "}
+                      messages
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       <Badge className="border-slate-200 bg-slate-50 text-slate-700">
+                        Unread replies: {unreadRepliesCount}
+                      </Badge>
+                      <Badge className="border-slate-200 bg-slate-50 text-slate-700">
                         Page {supportPage} / {totalSupportPages}
                       </Badge>
-                      {supportFilter !== "all" || supportQuery || supportSort !== "newest" ? (
+                      {supportFilter !== "all" ||
+                      supportQuery ||
+                      supportSort !== "newest" ? (
                         <Button
                           variant="secondary"
                           onClick={() => {
@@ -696,7 +842,7 @@ export default function Profile() {
                       </div>
 
                       {selectedSupport.adminReply ? (
-                        <div className="mt-4 rounded-2xl border border-sky-100 bg-linear-to-r from-sky-50 to-indigo-50 p-4">
+                        <div className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 to-indigo-50 p-4">
                           <div className="flex items-center gap-2">
                             <div className="grid h-8 w-8 place-items-center rounded-full bg-sky-600 text-xs font-bold text-white">
                               A
@@ -738,8 +884,8 @@ export default function Profile() {
               subtitle="Manage your current login session"
             />
 
-            <CardBody className="bg-linear-to-b from-white to-slate-50/60">
-              <div className="rounded-[1.5rem] border border-rose-100 bg-linear-to-r from-rose-50 to-white p-5">
+            <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
+              <div className="rounded-[1.5rem] border border-rose-100 bg-gradient-to-r from-rose-50 to-white p-5">
                 <div className="text-base font-bold text-slate-900">
                   Logout from your account
                 </div>
@@ -748,7 +894,12 @@ export default function Profile() {
                 </div>
 
                 <div className="mt-5">
-                  <Button variant="danger" onClick={onLogout}>
+                  <Button
+                    variant="danger"
+                    onClick={onLogout}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <LogOut size={16} />
                     Logout
                   </Button>
                 </div>
@@ -761,10 +912,13 @@ export default function Profile() {
   );
 }
 
-function HeroStat({ title, value, subtitle }) {
+function HeroStat({ icon, title, value, subtitle }) {
   return (
     <div className="rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">
+        {icon}
+      </div>
+      <div className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
         {title}
       </div>
       <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">

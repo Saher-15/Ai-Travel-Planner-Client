@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Compass,
+  Eye,
+  MapPinned,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { api } from "../api/client.js";
 import {
   Alert,
@@ -15,10 +24,21 @@ function fmtRange(start, end) {
   return start && end ? `${start} → ${end}` : "Dates not set";
 }
 
+function getTripDays(trip) {
+  return Number(trip?.itinerary?.tripSummary?.days || 0);
+}
+
+function getInterests(trip) {
+  return Array.isArray(trip?.preferences?.interests)
+    ? trip.preferences.interests
+    : [];
+}
+
 export default function MyTrips() {
-    useEffect(() => {
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
   const nav = useNavigate();
 
   const [trips, setTrips] = useState([]);
@@ -59,20 +79,29 @@ export default function MyTrips() {
     const q = query.trim().toLowerCase();
     if (!q) return trips;
 
-    return trips.filter((t) => (t.destination || "").toLowerCase().includes(q));
+    return trips.filter((trip) => {
+      const destination = String(trip?.destination || "").toLowerCase();
+      const budget = String(trip?.preferences?.budget || "").toLowerCase();
+      const pace = String(trip?.preferences?.pace || "").toLowerCase();
+      const interests = getInterests(trip).join(" ").toLowerCase();
+
+      return (
+        destination.includes(q) ||
+        budget.includes(q) ||
+        pace.includes(q) ||
+        interests.includes(q)
+      );
+    });
   }, [trips, query]);
 
   const totalTrips = trips.length;
   const filteredTrips = filtered.length;
-  const totalDays = trips.reduce(
-    (sum, trip) => sum + Number(trip?.itinerary?.tripSummary?.days || 0),
-    0
-  );
+  const totalDays = trips.reduce((sum, trip) => sum + getTripDays(trip), 0);
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-4xl border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
-        <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-indigo-50" />
         <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
 
@@ -94,16 +123,19 @@ export default function MyTrips() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <HeroStat
+                icon={<Compass size={18} />}
                 title="Saved Trips"
                 value={totalTrips}
                 subtitle="Stored in your account"
               />
               <HeroStat
+                icon={<Search size={18} />}
                 title="Search Results"
                 value={filteredTrips}
                 subtitle="Matching your filter"
               />
               <HeroStat
+                icon={<MapPinned size={18} />}
                 title="Planned Days"
                 value={totalDays}
                 subtitle="Across all itineraries"
@@ -142,12 +174,12 @@ export default function MyTrips() {
           subtitle="Search your destinations and manage saved itineraries"
         />
 
-        <CardBody className="space-y-5 bg-linear-to-b from-white to-slate-50/60">
+        <CardBody className="space-y-5 bg-gradient-to-b from-white to-slate-50/60">
           <div className="grid gap-4 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-5">
               <Input
-                label="Search by destination"
-                placeholder="e.g., City"
+                label="Search trips"
+                placeholder="Destination, pace, budget, or interest"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -155,8 +187,20 @@ export default function MyTrips() {
 
             <div className="lg:col-span-7">
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <Button onClick={() => nav("/create")}>Create Trip</Button>
-                <Button onClick={load} variant="secondary">
+                <Button
+                  onClick={() => nav("/create")}
+                  className="inline-flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  Create Trip
+                </Button>
+
+                <Button
+                  onClick={load}
+                  variant="secondary"
+                  className="inline-flex items-center gap-2"
+                >
+                  <RefreshCw size={16} />
                   Refresh
                 </Button>
               </div>
@@ -185,12 +229,12 @@ export default function MyTrips() {
         <TripsSkeleton />
       ) : filtered.length ? (
         <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
-          {filtered.map((t) => (
+          {filtered.map((trip) => (
             <TripCard
-              key={t._id}
-              trip={t}
-              onView={() => nav(`/trip/${t._id}`)}
-              onDelete={() => del(t._id)}
+              key={trip._id}
+              trip={trip}
+              onView={() => nav(`/trip/${trip._id}`)}
+              onDelete={() => del(trip._id)}
             />
           ))}
         </div>
@@ -207,14 +251,14 @@ export default function MyTrips() {
 
 function TripCard({ trip, onView, onDelete }) {
   const destination = trip.destination || "Untitled Trip";
-  const tripDays = trip.itinerary?.tripSummary?.days;
+  const tripDays = getTripDays(trip);
   const budget = trip.preferences?.budget;
   const pace = trip.preferences?.pace;
-  const interests = trip.preferences?.interests || [];
+  const interests = getInterests(trip);
 
   return (
     <Card className="group overflow-hidden border border-slate-200/80 transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_45px_-24px_rgba(15,23,42,0.24)]">
-      <div className="relative overflow-hidden bg-linear-to-br from-slate-900 via-slate-800 to-slate-700 p-5 text-white">
+      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 p-5 text-white">
         <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
         <div className="absolute bottom-0 left-0 h-20 w-20 rounded-full bg-sky-400/10 blur-2xl" />
 
@@ -233,7 +277,7 @@ function TripCard({ trip, onView, onDelete }) {
         </div>
       </div>
 
-      <CardBody className="space-y-5 bg-linear-to-b from-white to-slate-50/50">
+      <CardBody className="space-y-5 bg-gradient-to-b from-white to-slate-50/50">
         <div className="flex flex-wrap gap-2">
           {pace ? (
             <Badge className="border-sky-200 bg-sky-50 text-sky-700">
@@ -259,6 +303,7 @@ function TripCard({ trip, onView, onDelete }) {
             <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
               Interests
             </div>
+
             <div className="flex flex-wrap gap-2">
               {interests.slice(0, 5).map((item) => (
                 <span
@@ -278,10 +323,21 @@ function TripCard({ trip, onView, onDelete }) {
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Button onClick={onView} variant="secondary" className="w-full sm:flex-1">
+          <Button
+            onClick={onView}
+            variant="secondary"
+            className="inline-flex w-full items-center justify-center gap-2 sm:flex-1"
+          >
+            <Eye size={16} />
             View Trip
           </Button>
-          <Button onClick={onDelete} variant="danger" className="w-full sm:flex-1">
+
+          <Button
+            onClick={onDelete}
+            variant="danger"
+            className="inline-flex w-full items-center justify-center gap-2 sm:flex-1"
+          >
+            <Trash2 size={16} />
             Delete
           </Button>
         </div>
@@ -293,9 +349,9 @@ function TripCard({ trip, onView, onDelete }) {
 function EmptyTrips({ onCreate, onClear, hasSearch }) {
   return (
     <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
-      <CardBody className="bg-linear-to-b from-white to-slate-50/60">
+      <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
         <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white p-8 text-center sm:p-10">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-xl font-black text-white shadow-lg">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-xl font-black text-white shadow-lg">
             ✈
           </div>
 
@@ -315,7 +371,11 @@ function EmptyTrips({ onCreate, onClear, hasSearch }) {
                 Clear Search
               </Button>
             ) : null}
-            <Button onClick={onCreate}>Create Trip</Button>
+
+            <Button onClick={onCreate} className="inline-flex items-center gap-2">
+              <Plus size={16} />
+              Create Trip
+            </Button>
           </div>
         </div>
       </CardBody>
@@ -349,10 +409,13 @@ function TripsSkeleton() {
   );
 }
 
-function HeroStat({ title, value, subtitle }) {
+function HeroStat({ icon, title, value, subtitle }) {
   return (
     <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">
+        {icon}
+      </div>
+      <div className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
         {title}
       </div>
       <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">

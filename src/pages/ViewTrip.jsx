@@ -269,7 +269,7 @@ export default function ViewTrip() {
     if (!trip?.itinerary?.days?.length) return;
     const next = {};
     trip.itinerary.days.forEach((day, index) => {
-      next[day.day] = index === 0;
+      next[day.day] = false;
     });
     setOpenDays(next);
   }, [trip]);

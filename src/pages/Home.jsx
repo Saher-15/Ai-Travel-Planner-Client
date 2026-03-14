@@ -1,5 +1,16 @@
 import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  ArrowRight,
+  Compass,
+  FolderKanban,
+  Globe2,
+  MapPinned,
+  PlaneTakeoff,
+  Search,
+  Sparkles,
+  Wand2,
+} from "lucide-react";
 import { Button, Card, CardBody, Badge } from "../components/UI.jsx";
 
 const cx = (...c) => c.filter(Boolean).join(" ");
@@ -8,7 +19,8 @@ const STOCK = {
   hero: [
     "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80",
     "https://images.unsplash.com/photo-1526779259212-939e64788e3c?auto=format&fit=crop&w=1600&q=80",
-  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80",  ],
+    "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80",
+  ],
   visual:
     "https://images.unsplash.com/photo-1526772662000-3f88f10405ff?auto=format&fit=crop&w=1600&q=80",
 };
@@ -17,22 +29,22 @@ const features = [
   {
     title: "AI day-by-day itinerary",
     text: "Generate practical travel plans with structured morning, afternoon, and evening activities.",
-    icon: "✨",
+    icon: <Wand2 size={20} />,
   },
   {
     title: "Smart travel pacing",
     text: "Build trips that match different travel rhythms like relaxed, balanced, or packed adventures.",
-    icon: "⚡",
+    icon: <Compass size={20} />,
   },
   {
     title: "Save your journeys",
     text: "Keep all your travel plans in one place and revisit them anytime from your trip library.",
-    icon: "📁",
+    icon: <FolderKanban size={20} />,
   },
   {
     title: "Visual planning experience",
     text: "Enjoy a premium planner interface that feels modern, clean, and inspiring.",
-    icon: "🗺️",
+    icon: <MapPinned size={20} />,
   },
 ];
 
@@ -43,10 +55,30 @@ const highlights = [
 ];
 
 const stats = [
-  { label: "Generation speed", value: "Fast", sub: "quick itinerary creation flow" },
-  { label: "Daily structure", value: "3 blocks", sub: "morning / afternoon / evening" },
-  { label: "Trip management", value: "Easy", sub: "save and revisit your plans" },
-  { label: "Experience", value: "Premium", sub: "modern clean planner design" },
+  {
+    label: "Generation speed",
+    value: "Fast",
+    sub: "quick itinerary creation flow",
+    icon: <Sparkles size={18} />,
+  },
+  {
+    label: "Daily structure",
+    value: "3 blocks",
+    sub: "morning / afternoon / evening",
+    icon: <Globe2 size={18} />,
+  },
+  {
+    label: "Trip management",
+    value: "Easy",
+    sub: "save and revisit your plans",
+    icon: <FolderKanban size={18} />,
+  },
+  {
+    label: "Experience",
+    value: "Premium",
+    sub: "modern clean planner design",
+    icon: <PlaneTakeoff size={18} />,
+  },
 ];
 
 const steps = [
@@ -124,9 +156,10 @@ const travelModes = [
 ];
 
 export default function Home() {
-    useEffect(() => {
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
   const nav = useNavigate();
   const [a, b, c] = useMemo(() => STOCK.hero, []);
 
@@ -137,23 +170,22 @@ export default function Home() {
     if (payload.travelers) params.set("travelers", payload.travelers);
     if (payload.tripType) params.set("tripType", payload.tripType);
 
-    nav(`/create?${params.toString()}`);
+    const query = params.toString();
+    nav(query ? `/create?${query}` : "/create");
   };
 
   return (
     <div className="space-y-20">
-      {/* HERO */}
-      <section className="relative overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-[0_30px_100px_-35px_rgba(15,23,42,0.35)]">
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_30px_100px_-35px_rgba(15,23,42,0.35)]">
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_30%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_30%),linear-gradient(to_bottom_right,#f8fbff,#ffffff,#f2f8ff)]" />
           <div className="absolute -left-10 top-0 h-72 w-72 rounded-full bg-sky-200/30 blur-3xl" />
           <div className="absolute right-0 top-16 h-80 w-80 rounded-full bg-indigo-200/25 blur-3xl" />
           <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-100/30 blur-3xl" />
-          <div className="absolute inset-0 opacity-40 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[32px_32px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-size-[32px_32px] opacity-40" />
         </div>
 
         <div className="relative grid gap-10 px-6 py-8 sm:px-8 sm:py-10 lg:grid-cols-12 lg:px-10 lg:py-14">
-          {/* LEFT */}
           <div className="lg:col-span-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-white/90 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.9)]" />
@@ -163,7 +195,7 @@ export default function Home() {
             <div className="mt-6 max-w-3xl">
               <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-6xl xl:text-7xl">
                 Turn ideas into
-                <span className="mt-2 block bg-linear-to-r from-sky-700 via-blue-600 to-indigo-500 bg-clip-text text-transparent">
+                <span className="mt-2 block bg-gradient-to-r from-sky-700 via-blue-600 to-indigo-500 bg-clip-text text-transparent">
                   extraordinary travel plans.
                 </span>
               </h1>
@@ -188,14 +220,20 @@ export default function Home() {
             </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button className="w-full sm:w-auto" onClick={() => nav("/create")}>
+              <Button
+                className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
+                onClick={() => nav("/create")}
+              >
+                <PlaneTakeoff size={16} />
                 Start Planning
               </Button>
+
               <Button
                 variant="secondary"
-                className="w-full sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
                 onClick={() => nav("/trips")}
               >
+                <FolderKanban size={16} />
                 Explore My Trips
               </Button>
             </div>
@@ -206,17 +244,23 @@ export default function Home() {
                   key={item.label}
                   className="rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-lg"
                 >
-                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">
+                    {item.icon}
+                  </div>
+                  <div className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                     {item.label}
                   </div>
-                  <div className="mt-2 text-2xl font-black text-slate-900">{item.value}</div>
-                  <div className="mt-1 text-xs leading-5 text-slate-500">{item.sub}</div>
+                  <div className="mt-2 text-2xl font-black text-slate-900">
+                    {item.value}
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-slate-500">
+                    {item.sub}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* RIGHT */}
           <div className="lg:col-span-5">
             <div className="relative">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -225,8 +269,8 @@ export default function Home() {
                   className="min-h-60 sm:row-span-2 sm:min-h-full"
                   badge="Top destinations"
                 />
-                <PhotoCard src={b} className="min-h-42.5" badge="Culture & food" />
-                <PhotoCard src={c} className="min-h-42.5" badge="Nature & escape" />
+                <PhotoCard src={b} className="min-h-[10.625rem]" badge="Culture & food" />
+                <PhotoCard src={c} className="min-h-[10.625rem]" badge="Nature & escape" />
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -235,22 +279,19 @@ export default function Home() {
                   subtitle="No bookings. Just destination-first trip creation."
                   badge="Clear identity"
                 />
-                <div className="rounded-3xl border border-sky-100 bg-linear-to-br from-sky-600 to-blue-700 p-4 text-white shadow-lg">
+                <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-600 to-blue-700 p-4 text-white shadow-lg">
                   <div className="text-sm font-bold">Premium planner feel</div>
                   <div className="mt-1 text-xs text-white/80">
                     Strong visuals, smart sections, and a cleaner project story.
                   </div>
                 </div>
               </div>
-
-
             </div>
           </div>
         </div>
       </section>
 
-      {/* CORE VALUE STRIP */}
-      <section className="overflow-hidden rounded-4xl border border-slate-200 bg-white px-6 py-5 shadow-sm sm:px-8">
+      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white px-6 py-5 shadow-sm sm:px-8">
         <div className="flex flex-wrap items-center justify-center gap-3">
           {[
             "AI itinerary builder",
@@ -268,8 +309,6 @@ export default function Home() {
         </div>
       </section>
 
-
-      {/* HOW IT WORKS */}
       <section className="space-y-6">
         <div className="max-w-2xl">
           <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
@@ -296,8 +335,12 @@ export default function Home() {
                   <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-600 text-sm font-black text-white shadow-sm">
                     {step.number}
                   </div>
-                  <div className="mt-4 text-lg font-black text-slate-900">{step.title}</div>
-                  <div className="mt-2 text-sm leading-6 text-slate-600">{step.text}</div>
+                  <div className="mt-4 text-lg font-black text-slate-900">
+                    {step.title}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-600">
+                    {step.text}
+                  </div>
                 </div>
               </CardBody>
             </Card>
@@ -305,7 +348,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PLANNING MODES */}
       <section className="space-y-6">
         <div className="max-w-2xl">
           <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
@@ -337,7 +379,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* POPULAR DESTINATIONS */}
       <section className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="max-w-2xl">
@@ -352,7 +393,12 @@ export default function Home() {
             </p>
           </div>
 
-          <Button variant="secondary" className="text-xs sm:text-sm" onClick={() => nav("/create")}>
+          <Button
+            variant="secondary"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm"
+            onClick={() => nav("/create")}
+          >
+            <ArrowRight size={16} />
             Start a blank trip
           </Button>
         </div>
@@ -370,7 +416,7 @@ export default function Home() {
                   className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/15 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
                 <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
                   <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
                     {d.badge}
@@ -391,7 +437,7 @@ export default function Home() {
                 </div>
 
                 <Button
-                  className="w-full"
+                  className="inline-flex w-full items-center justify-center gap-2"
                   onClick={() =>
                     goToCreate({
                       destination: d.name,
@@ -400,6 +446,7 @@ export default function Home() {
                     })
                   }
                 >
+                  <MapPinned size={16} />
                   Plan this destination
                 </Button>
               </CardBody>
@@ -408,7 +455,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FEATURES */}
       <section className="space-y-6">
         <div className="max-w-2xl">
           <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
@@ -431,7 +477,7 @@ export default function Home() {
               <CardBody className="relative">
                 <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-sky-100 blur-2xl transition duration-300 group-hover:bg-sky-200" />
                 <div className="relative">
-                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-600 text-xl text-white shadow-sm">
+                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-sm">
                     {f.icon}
                   </div>
                   <div className="text-lg font-black text-slate-900">{f.title}</div>
@@ -443,10 +489,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SHOWCASE */}
       <section className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-5">
-          <Card className="h-full overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-sm">
+          <Card className="h-full overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
             <CardBody className="flex h-full flex-col justify-between space-y-6">
               <div>
                 <div className="inline-flex rounded-full border border-slate-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
@@ -476,7 +521,12 @@ export default function Home() {
               </div>
 
               <div>
-                <Button variant="secondary" onClick={() => nav("/create")}>
+                <Button
+                  variant="secondary"
+                  className="inline-flex items-center gap-2"
+                  onClick={() => nav("/create")}
+                >
+                  <PlaneTakeoff size={16} />
                   Build My Trip
                 </Button>
               </div>
@@ -485,14 +535,14 @@ export default function Home() {
         </div>
 
         <div className="lg:col-span-7">
-          <div className="group relative overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-[0_18px_60px_-30px_rgba(15,23,42,0.35)]">
+          <div className="group relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_60px_-30px_rgba(15,23,42,0.35)]">
             <img
               src={STOCK.visual}
               alt="Travel inspiration"
-              className="h-110 w-full object-cover transition duration-700 group-hover:scale-105"
+              className="h-[27.5rem] w-full object-cover transition duration-700 group-hover:scale-105"
               loading="lazy"
             />
-            <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/20 to-transparent" />
 
             <div className="absolute left-5 right-5 top-5 flex flex-wrap gap-3">
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
@@ -524,12 +574,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FINAL CTA */}
-      <section className="relative overflow-hidden rounded-4xl border border-slate-200 bg-linear-to-br from-sky-700 via-blue-700 to-indigo-800 p-8 text-white shadow-[0_20px_80px_-30px_rgba(15,23,42,0.5)] sm:p-10">
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-gradient-to-br from-sky-700 via-blue-700 to-indigo-800 p-8 text-white shadow-[0_20px_80px_-30px_rgba(15,23,42,0.5)] sm:p-10">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -left-16 top-0 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -bottom-10 -right-5 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
-          <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] bg-size-[30px_30px]" />
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] bg-size-[30px_30px] opacity-20" />
         </div>
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -547,9 +596,14 @@ export default function Home() {
           </div>
 
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <Button className="w-full sm:w-auto" onClick={() => nav("/create")}>
+            <Button
+              className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
+              onClick={() => nav("/create")}
+            >
+              <PlaneTakeoff size={16} />
               Create Trip
             </Button>
+
             <Button
               variant="secondary"
               className="w-full border-white/20 bg-white/10 text-white hover:bg-white/15 sm:w-auto"
@@ -578,7 +632,7 @@ function PhotoCard({ src, badge, className = "" }) {
         className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
         loading="lazy"
       />
-      <div className="absolute inset-0 bg-linear-to-t from-black/65 via-black/10 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
       <div className="absolute left-3 right-3 top-3 flex justify-between">
         <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
           {badge}
@@ -603,18 +657,6 @@ function InfoCard({ title, subtitle, badge }) {
         </div>
         <Badge>{badge}</Badge>
       </div>
-    </div>
-  );
-}
-
-function TrustItem({ title, text, icon }) {
-  return (
-    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md">
-      <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-600 text-lg text-white shadow-sm">
-        {icon}
-      </div>
-      <div className="text-lg font-black text-slate-900">{title}</div>
-      <div className="mt-2 text-sm leading-6 text-slate-600">{text}</div>
     </div>
   );
 }

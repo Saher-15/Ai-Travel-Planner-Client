@@ -1,5 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { api } from "../api/client.js";
 import {
   Alert,
@@ -16,21 +23,58 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function PasswordField({
+  label,
+  value,
+  onChange,
+  show,
+  onToggle,
+  placeholder = "••••••••",
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-semibold text-slate-700">{label}</label>
+
+      <div className="relative">
+        <input
+          type={show ? "text" : "password"}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          autoComplete="current-password"
+          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 pr-12 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+        />
+
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={show ? "Hide password" : "Show password"}
+          className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-sky-600"
+        >
+          {show ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Login() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
   const nav = useNavigate();
   const { refresh } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
   const canSubmit = useMemo(() => {
     return normalizeEmail(email) && password.trim().length > 0 && !loading;
   }, [email, password, loading]);
-
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -78,8 +122,8 @@ export default function Login() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-4xl border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
-        <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-indigo-50" />
         <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
 
@@ -101,16 +145,19 @@ export default function Login() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <HeroStat
+                icon={<LockKeyhole size={18} />}
                 title="Trips"
                 value="Saved"
                 subtitle="Your itineraries in one place"
               />
               <HeroStat
+                icon={<Sparkles size={18} />}
                 title="Planner"
                 value="AI"
                 subtitle="Generate smarter travel plans"
               />
               <HeroStat
+                icon={<ShieldCheck size={18} />}
                 title="Access"
                 value="Secure"
                 subtitle="Manage your account safely"
@@ -151,7 +198,7 @@ export default function Login() {
               subtitle="Enter your email and password to continue"
             />
 
-            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               <form onSubmit={onSubmit} className="space-y-6">
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-5">
@@ -173,13 +220,12 @@ export default function Login() {
                       autoComplete="email"
                     />
 
-                    <Input
+                    <PasswordField
                       label="Password"
-                      type="password"
-                      placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      autoComplete="current-password"
+                      show={showPassword}
+                      onToggle={() => setShowPassword((prev) => !prev)}
                     />
                   </div>
                 </div>
@@ -212,7 +258,11 @@ export default function Login() {
                     Create account →
                   </Link>
 
-                  <Button type="submit" disabled={!canSubmit} className="w-full sm:w-auto">
+                  <Button
+                    type="submit"
+                    disabled={!canSubmit}
+                    className="w-full sm:w-auto"
+                  >
                     {loading ? "Logging in..." : "Login"}
                   </Button>
                 </div>
@@ -228,7 +278,7 @@ export default function Login() {
               subtitle="Your travel tools in one place"
             />
 
-            <CardBody className="bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
               <div className="space-y-4">
                 <StepCard
                   number="1"
@@ -255,8 +305,8 @@ export default function Login() {
               subtitle="Start your travel planner journey"
             />
 
-            <CardBody className="bg-linear-to-b from-white to-slate-50/60">
-              <div className="rounded-3xl border border-sky-100 bg-linear-to-r from-sky-50 to-indigo-50 p-5">
+            <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
+              <div className="rounded-3xl border border-sky-100 bg-gradient-to-r from-sky-50 to-indigo-50 p-5">
                 <div className="text-base font-bold text-slate-900">
                   New here?
                 </div>
@@ -282,10 +332,13 @@ export default function Login() {
   );
 }
 
-function HeroStat({ title, value, subtitle }) {
+function HeroStat({ icon, title, value, subtitle }) {
   return (
     <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">
+        {icon}
+      </div>
+      <div className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
         {title}
       </div>
       <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
@@ -308,7 +361,7 @@ function MiniInfo({ title, text }) {
 function StepCard({ number, title, text }) {
   return (
     <div className="flex gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-sm font-black text-white">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-sm font-black text-white">
         {number}
       </div>
 

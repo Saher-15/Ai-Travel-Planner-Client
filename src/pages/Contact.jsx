@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api } from "../api/client.js";
 import { useAuth } from "../auth/AuthProvider";
 import {
@@ -10,11 +10,27 @@ import {
   CardHeader,
   Input,
 } from "../components/UI.jsx";
+import {
+  LifeBuoy,
+  Mail,
+  MessageSquareText,
+  Send,
+  Sparkles,
+  User,
+} from "lucide-react";
+
+function countWords(value) {
+  return String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
 
 export default function Contact() {
-    useEffect(() => {
-      window.scrollTo(0, 0);
-    }, []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const { user } = useAuth();
 
   const [form, setForm] = useState({
@@ -27,13 +43,44 @@ export default function Contact() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      name: user?.name || prev.name,
+      email: user?.email || prev.email,
+    }));
+  }, [user]);
+
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  const subjectLength = form.subject.trim().length;
+  const messageLength = form.message.trim().length;
+  const messageWords = countWords(form.message);
+
+  const canSubmit = useMemo(() => {
+    return (
+      !loading &&
+      form.name.trim().length > 0 &&
+      form.email.trim().length > 0 &&
+      form.subject.trim().length > 0 &&
+      form.message.trim().length > 0
+    );
+  }, [form, loading]);
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setMsg(null);
+
+    if (!form.name.trim() || !form.email.trim() || !form.subject.trim() || !form.message.trim()) {
+      setMsg({
+        type: "error",
+        text: "Please fill in all fields before sending your message.",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -69,7 +116,7 @@ export default function Contact() {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
-        <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-indigo-50" />
         <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
 
@@ -91,16 +138,19 @@ export default function Contact() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <HeroStat
+                icon={<Sparkles size={18} />}
                 title="Trip help"
                 value="AI"
                 subtitle="Planner guidance"
               />
               <HeroStat
+                icon={<LifeBuoy size={18} />}
                 title="Support"
                 value="24/7"
                 subtitle="Message anytime"
               />
               <HeroStat
+                icon={<MessageSquareText size={18} />}
                 title="Replies"
                 value="Profile"
                 subtitle="Track responses"
@@ -141,17 +191,23 @@ export default function Contact() {
               subtitle="We’d love to hear from you"
             />
 
-            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               {msg ? <Alert type={msg.type}>{msg.text}</Alert> : null}
 
               <form onSubmit={onSubmit} className="space-y-6">
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-5">
-                    <div className="text-lg font-bold text-slate-900">
-                      Your information
+                  <div className="mb-5 flex items-start gap-3">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-sm">
+                      <User size={18} />
                     </div>
-                    <div className="text-sm text-slate-500">
-                      We’ll use these details for your support request
+
+                    <div>
+                      <div className="text-lg font-bold text-slate-900">
+                        Your information
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        We’ll use these details for your support request
+                      </div>
                     </div>
                   </div>
 
@@ -175,23 +231,34 @@ export default function Contact() {
                 </div>
 
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-5">
-                    <div className="text-lg font-bold text-slate-900">
-                      Message details
+                  <div className="mb-5 flex items-start gap-3">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-sm">
+                      <Mail size={18} />
                     </div>
-                    <div className="text-sm text-slate-500">
-                      Tell us clearly what you need help with
+
+                    <div>
+                      <div className="text-lg font-bold text-slate-900">
+                        Message details
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        Tell us clearly what you need help with
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-5">
-                    <Input
-                      label="Subject"
-                      placeholder="What do you need help with?"
-                      required
-                      value={form.subject}
-                      onChange={(e) => updateField("subject", e.target.value)}
-                    />
+                    <div className="space-y-2">
+                      <Input
+                        label="Subject"
+                        placeholder="What do you need help with?"
+                        required
+                        value={form.subject}
+                        onChange={(e) => updateField("subject", e.target.value)}
+                      />
+                      <div className="text-right text-xs text-slate-500">
+                        {subjectLength} characters
+                      </div>
+                    </div>
 
                     <label className="block">
                       <div className="mb-1.5 text-sm font-semibold text-slate-700">
@@ -205,19 +272,32 @@ export default function Contact() {
                         placeholder="Tell us how we can help you..."
                         className="w-full resize-none rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                       />
-                      <div className="mt-2 text-xs text-slate-500">
-                        Be specific so we can help you faster and better.
+                      <div className="mt-2 flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                        <span>Be specific so we can help you faster and better.</span>
+                        <span>
+                          {messageWords} words • {messageLength} characters
+                        </span>
                       </div>
                     </label>
                   </div>
                 </div>
 
+                <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                  Replies from admin will appear in your profile page, so you can
+                  track all support communication in one place.
+                </div>
+
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-sm text-slate-500">
-                    Replies from admin will appear in your profile page.
+                    Clear messages usually get faster and better replies.
                   </div>
 
-                  <Button type="submit" disabled={loading}>
+                  <Button
+                    type="submit"
+                    disabled={!canSubmit}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Send size={16} />
                     {loading ? "Sending..." : "Send Message"}
                   </Button>
                 </div>
@@ -233,7 +313,7 @@ export default function Contact() {
               subtitle="Simple and organized communication"
             />
 
-            <CardBody className="bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
               <div className="space-y-4">
                 <StepCard
                   number="1"
@@ -260,7 +340,7 @@ export default function Contact() {
               subtitle="Get better support answers"
             />
 
-            <CardBody className="bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
               <div className="space-y-3 text-sm text-slate-600">
                 <TipItem text="Use a clear subject line." />
                 <TipItem text="Describe the issue or request in simple steps." />
@@ -275,10 +355,13 @@ export default function Contact() {
   );
 }
 
-function HeroStat({ title, value, subtitle }) {
+function HeroStat({ icon, title, value, subtitle }) {
   return (
     <div className="rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">
+        {icon}
+      </div>
+      <div className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
         {title}
       </div>
       <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
@@ -301,7 +384,7 @@ function MiniInfo({ title, text }) {
 function StepCard({ number, title, text }) {
   return (
     <div className="flex gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-sky-500 via-blue-600 to-indigo-700 text-sm font-black text-white">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-sm font-black text-white">
         {number}
       </div>
 

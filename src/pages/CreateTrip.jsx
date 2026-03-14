@@ -1,5 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  CalendarDays,
+  Compass,
+  MapPinned,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Ticket,
+  Users,
+  Wand2,
+  Music4,
+  UtensilsCrossed,
+  Drama,
+  Trophy,
+  MoonStar,
+  PartyPopper,
+} from "lucide-react";
 import { api } from "../api/client.js";
 import {
   Alert,
@@ -24,14 +41,49 @@ const interestOptions = [
   "family",
 ];
 
-const eventTypeOptions = [
-  "festival",
-  "concert",
-  "culture",
-  "nightlife",
-  "food",
-  "family",
-  "sports",
+const eventTypeCards = [
+  {
+    id: "festival",
+    label: "Festivals",
+    icon: <PartyPopper size={18} />,
+    desc: "Seasonal celebrations and city events",
+  },
+  {
+    id: "concert",
+    label: "Concerts",
+    icon: <Music4 size={18} />,
+    desc: "Live music and performances",
+  },
+  {
+    id: "culture",
+    label: "Culture",
+    icon: <Drama size={18} />,
+    desc: "Museums, exhibitions, and local arts",
+  },
+  {
+    id: "nightlife",
+    label: "Nightlife",
+    icon: <MoonStar size={18} />,
+    desc: "Evening energy and late experiences",
+  },
+  {
+    id: "food",
+    label: "Food",
+    icon: <UtensilsCrossed size={18} />,
+    desc: "Markets, tastings, and food events",
+  },
+  {
+    id: "family",
+    label: "Family",
+    icon: <Users size={18} />,
+    desc: "Kid-friendly and group-friendly events",
+  },
+  {
+    id: "sports",
+    label: "Sports",
+    icon: <Trophy size={18} />,
+    desc: "Matches, games, and sports happenings",
+  },
 ];
 
 function toISODateLocal(date) {
@@ -160,9 +212,10 @@ function normalizePlace(place) {
 }
 
 export default function CreateTrip() {
-    useEffect(() => {
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -224,33 +277,31 @@ export default function CreateTrip() {
       setInterests((prev) => {
         const next = new Set(prev);
         next.add("culture");
-
         if (tripType === "food") next.add("food");
         if (tripType === "nature") next.add("nature");
         if (tripType === "highlights") next.add("history");
-
         return [...next];
       });
     }
 
     if (sourceTab === "Hotels" || sourceTab === "Stays") {
       setPace("relaxed");
-
-      if (tripType === "suite") {
-        setBudget("high");
-      } else if (tripType === "apartment") {
-        setBudget("mid");
-      }
+      if (tripType === "suite") setBudget("high");
+      else if (tripType === "apartment") setBudget("mid");
     }
 
     if (sourceTab === "Flights") {
-      if (tripType === "multi") {
-        setPace("packed");
-      } else if (tripType === "oneway") {
-        setPace("moderate");
-      }
+      if (tripType === "multi") setPace("packed");
+      else if (tripType === "oneway") setPace("moderate");
     }
-  }, [destinationParam, startDateParam, endDateParam, travelersParam, sourceTab, tripType]);
+  }, [
+    destinationParam,
+    startDateParam,
+    endDateParam,
+    travelersParam,
+    sourceTab,
+    tripType,
+  ]);
 
   const minStartDate = todayISOPlus(0);
   const minEndDate = useMemo(
@@ -319,6 +370,14 @@ export default function CreateTrip() {
     includeEvents,
   ]);
 
+  const eventSummary = useMemo(() => {
+    if (!includeEvents) return "Events are off for this trip.";
+    if (!eventTypes.length) {
+      return "AI will look for a balanced mix of relevant local events during your dates.";
+    }
+    return `AI will prioritize ${eventTypes.join(", ")} events during your trip.`;
+  }, [includeEvents, eventTypes]);
+
   function toggleInterest(x) {
     setInterests((prev) =>
       prev.includes(x) ? prev.filter((i) => i !== x) : [...prev, x]
@@ -342,12 +401,10 @@ export default function CreateTrip() {
       setEndDate(addDays(startDate, 1));
       return;
     }
-
     if (value <= startDate) {
       setEndDate(addDays(startDate, 1));
       return;
     }
-
     setEndDate(value);
   }
 
@@ -473,36 +530,33 @@ export default function CreateTrip() {
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const payload = {
-        tripMode,
-        destination: tripMode === "single" ? cleanDestination : cities.join(" → "),
-        destinations: tripMode === "multi" ? cities : [cleanDestination],
-        startDate,
-        endDate,
-        preferences: {
-          pace,
-          budget,
-          interests,
-          notes: cleanNotes,
-          travelers: {
-            adults: Number(travelers.adults || 0),
-            children: Number(travelers.children || 0),
-            infants: Number(travelers.infants || 0),
-            total: travelerCount,
-            summary: travelerSummary,
-          },
-          sourceTab,
-          tripType,
-          from,
-          includeEvents,
-          eventTypes,
+    const payload = {
+      tripMode,
+      destination: tripMode === "single" ? cleanDestination : cities.join(" → "),
+      destinations: tripMode === "multi" ? cities : [cleanDestination],
+      startDate,
+      endDate,
+      preferences: {
+        pace,
+        budget,
+        interests,
+        notes: cleanNotes,
+        travelers: {
+          adults: Number(travelers.adults || 0),
+          children: Number(travelers.children || 0),
+          infants: Number(travelers.infants || 0),
+          total: travelerCount,
+          summary: travelerSummary,
         },
-        placeMeta:
-          tripMode === "single" && selectedPlace
-            ? {
+        sourceTab,
+        tripType,
+        from,
+        includeEvents,
+        eventTypes,
+      },
+      placeMeta:
+        tripMode === "single" && selectedPlace
+          ? {
               label: selectedPlace.placeName,
               name: selectedPlace.name,
               country: selectedPlace.country,
@@ -510,10 +564,10 @@ export default function CreateTrip() {
               lng: selectedPlace.center?.[0] ?? null,
               lat: selectedPlace.center?.[1] ?? null,
             }
-            : null,
-        multiCityMeta:
-          tripMode === "multi"
-            ? multiCityPlaces.map((city) => ({
+          : null,
+      multiCityMeta:
+        tripMode === "multi"
+          ? multiCityPlaces.map((city) => ({
               label: city.placeName,
               name: city.name,
               country: city.country,
@@ -521,25 +575,18 @@ export default function CreateTrip() {
               lng: city.center?.[0] ?? null,
               lat: city.center?.[1] ?? null,
             }))
-            : [],
-      };
+          : [],
+    };
 
-      const { data: trip } = await api.post("/trips/generate-and-save", payload);
-      nav(`/trip/${trip._id}`);
-    } catch (e2) {
-      setErr(
-        e2?.response?.data?.message ||
-        "Generate failed. Please log in and try again."
-      );
-    } finally {
-      setLoading(false);
-    }
+    nav("/generating-trip", {
+      state: { payload },
+    });
   }
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-4xl border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
-        <div className="absolute inset-0 bg-linear-to-br from-sky-50 via-white to-indigo-50" />
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-indigo-50" />
         <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
 
@@ -561,18 +608,22 @@ export default function CreateTrip() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-4">
               <TopHeroStat
+                icon={<MapPinned size={18} />}
                 label="Trip mode"
                 value={tripMode === "multi" ? "Multi-city" : "One city"}
               />
               <TopHeroStat
+                icon={<CalendarDays size={18} />}
                 label="Duration"
                 value={daysCount ? `${daysCount} days` : "Check dates"}
               />
               <TopHeroStat
+                icon={<Users size={18} />}
                 label="Travelers"
                 value={travelerCount ? `${travelerCount} total` : "Not set"}
               />
               <TopHeroStat
+                icon={<Sparkles size={18} />}
                 label="Events"
                 value={includeEvents ? "Enabled" : "Disabled"}
               />
@@ -604,7 +655,7 @@ export default function CreateTrip() {
                 />
                 <MiniInsight
                   title="Events ready"
-                  text="Optionally include concerts, food, culture, nightlife, and more."
+                  text="You can make events optional, broad, or highly specific."
                 />
               </div>
             </div>
@@ -625,7 +676,7 @@ export default function CreateTrip() {
               }
             />
 
-            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               <form onSubmit={generate} className="space-y-6">
                 <SectionBlock
                   title="Trip mode"
@@ -700,9 +751,10 @@ export default function CreateTrip() {
 
                         <Button
                           type="button"
-                          className="w-full sm:w-auto"
+                          className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
                           onClick={addMultiCity}
                         >
+                          <Plus size={16} />
                           Add city
                         </Button>
                       </div>
@@ -925,55 +977,154 @@ export default function CreateTrip() {
 
                 <SectionBlock
                   title="Events during your trip"
-                  subtitle="Add local concerts, nightlife, festivals, food events, and more"
+                  subtitle="Make events optional, then choose the kinds of experiences you want the AI to look for"
                   tone="indigo"
                   right={
-                    <button
-                      type="button"
-                      onClick={() => setIncludeEvents((prev) => !prev)}
-                      className={cx(
-                        "rounded-full px-4 py-2 text-xs font-bold transition-all duration-200",
+                    <Badge
+                      className={
                         includeEvents
-                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
-                          : "bg-slate-200 text-slate-700"
-                      )}
+                          ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                          : "border-slate-200 bg-slate-100 text-slate-600"
+                      }
                     >
-                      {includeEvents ? "Enabled" : "Disabled"}
-                    </button>
+                      {includeEvents ? "Optional feature on" : "Optional feature off"}
+                    </Badge>
                   }
                 >
-                  {includeEvents ? (
-                    <div>
-                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                        Event types
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {eventTypeOptions.map((x) => {
-                          const active = eventTypes.includes(x);
+                  <div className="space-y-4">
+                    <div
+                      className={cx(
+                        "rounded-[1.25rem] border p-4 transition-all",
+                        includeEvents
+                          ? "border-indigo-200 bg-gradient-to-r from-indigo-50 to-sky-50"
+                          : "border-slate-200 bg-slate-50"
+                      )}
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={cx(
+                              "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl",
+                              includeEvents
+                                ? "bg-indigo-600 text-white"
+                                : "bg-slate-200 text-slate-500"
+                            )}
+                          >
+                            <Ticket size={18} />
+                          </div>
 
-                          return (
-                            <button
-                              type="button"
-                              key={x}
-                              onClick={() => toggleEventType(x)}
-                              className={cx(
-                                "rounded-full border px-3.5 py-2 text-xs font-semibold capitalize transition-all duration-200",
-                                active
-                                  ? "border-indigo-600 bg-indigo-600 text-white"
-                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                              )}
-                            >
-                              {x}
-                            </button>
-                          );
-                        })}
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">
+                              Include local events
+                            </div>
+                            <div className="mt-1 text-sm leading-6 text-slate-600">
+                              Add concerts, festivals, food events, nightlife, and
+                              more that match your dates and destination.
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIncludeEvents((prev) => !prev)}
+                          className={cx(
+                            "rounded-full px-4 py-2 text-xs font-bold transition-all duration-200",
+                            includeEvents
+                              ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
+                              : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                          )}
+                        >
+                          {includeEvents ? "Enabled" : "Enable events"}
+                        </button>
+                      </div>
+
+                      <div className="mt-4 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-600">
+                        {eventSummary}
                       </div>
                     </div>
-                  ) : (
-                    <div className="rounded-[1.25rem] border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-500">
-                      Events are currently turned off for this trip.
-                    </div>
-                  )}
+
+                    {includeEvents ? (
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">
+                              Event preferences
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              Leave all unselected for a broad mix, or pick specific
+                              event styles.
+                            </div>
+                          </div>
+
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            {eventTypes.length || "All"} selected
+                          </span>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {eventTypeCards.map((item) => {
+                            const active = eventTypes.includes(item.id);
+
+                            return (
+                              <button
+                                type="button"
+                                key={item.id}
+                                onClick={() => toggleEventType(item.id)}
+                                className={cx(
+                                  "rounded-[1.25rem] border p-4 text-left transition-all duration-200",
+                                  active
+                                    ? "border-indigo-500 bg-indigo-50 shadow-sm"
+                                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                                )}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div
+                                    className={cx(
+                                      "flex h-10 w-10 items-center justify-center rounded-2xl",
+                                      active
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-slate-100 text-slate-600"
+                                    )}
+                                  >
+                                    {item.icon}
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <div
+                                        className={cx(
+                                          "text-sm font-bold",
+                                          active
+                                            ? "text-indigo-700"
+                                            : "text-slate-900"
+                                        )}
+                                      >
+                                        {item.label}
+                                      </div>
+                                      {active ? (
+                                        <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                          Selected
+                                        </span>
+                                      ) : null}
+                                    </div>
+
+                                    <div className="mt-1 text-xs leading-5 text-slate-500">
+                                      {item.desc}
+                                    </div>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
+                        Events are optional. Turn this on any time if you want your
+                        itinerary to include local happenings during your trip.
+                      </div>
+                    )}
+                  </div>
                 </SectionBlock>
 
                 <SectionBlock
@@ -1007,8 +1158,9 @@ export default function CreateTrip() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full sm:w-auto"
+                    className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
                   >
+                    <Wand2 size={16} />
                     {loading ? "Generating..." : "Generate & Save"}
                   </Button>
 
@@ -1024,9 +1176,10 @@ export default function CreateTrip() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="w-full sm:w-auto"
+                    className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
                     onClick={resetForm}
                   >
+                    <RefreshCw size={16} />
                     Reset Form
                   </Button>
                 </div>
@@ -1037,7 +1190,7 @@ export default function CreateTrip() {
 
         <div className="space-y-6 xl:col-span-7">
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
-            <div className="relative overflow-hidden bg-linear-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white">
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white">
               <div className="absolute inset-0">
                 <div className="absolute -right-10 top-0 h-40 w-40 rounded-full bg-sky-500/20 blur-3xl" />
                 <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl" />
@@ -1065,9 +1218,7 @@ export default function CreateTrip() {
                     {tripMode === "multi" && multiCityPlaces.length ? (
                       <GlassPill>{multiCityPlaces.length} cities</GlassPill>
                     ) : null}
-                    {travelerCount ? (
-                      <GlassPill>{travelerSummary}</GlassPill>
-                    ) : null}
+                    {travelerCount ? <GlassPill>{travelerSummary}</GlassPill> : null}
                     {includeEvents ? <GlassPill>local events</GlassPill> : null}
                   </div>
                 </div>
@@ -1091,7 +1242,7 @@ export default function CreateTrip() {
               </div>
             </div>
 
-            <CardBody className="space-y-6 bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               <div className="grid gap-4 sm:grid-cols-2">
                 <PreviewCard
                   title="Day structure"
@@ -1164,14 +1315,21 @@ export default function CreateTrip() {
               )}
 
               {includeEvents ? (
-                <div className="rounded-3xl border border-indigo-100 bg-linear-to-r from-indigo-50 to-sky-50 p-4 text-sm text-slate-600">
+                <div className="rounded-3xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-sky-50 p-4 text-sm text-slate-600">
                   <div className="mb-1 font-bold text-slate-900">
                     Events enabled
                   </div>
-                  Your trip will also try to include local happenings within your
-                  selected date range.
+                  {eventSummary}
                 </div>
-              ) : null}
+              ) : (
+                <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+                  <div className="mb-1 font-bold text-slate-900">
+                    Events optional
+                  </div>
+                  You can keep events off for a cleaner classic itinerary, or turn
+                  them on for local happenings during your dates.
+                </div>
+              )}
 
               {notes.trim() ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
@@ -1208,7 +1366,7 @@ export default function CreateTrip() {
               }
             />
 
-            <CardBody className="space-y-4 bg-linear-to-b from-white to-slate-50/60">
+            <CardBody className="space-y-4 bg-gradient-to-b from-white to-slate-50/60">
               <div className="overflow-hidden rounded-3xl border border-slate-200 shadow-sm">
                 <MapTilerMap query={mapQuery} height={400} />
               </div>
@@ -1270,7 +1428,12 @@ function ModeCard({ active, tone, title, text, onClick }) {
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className={cx("text-sm font-bold", active ? titleActive : "text-slate-900")}>
+          <div
+            className={cx(
+              "text-sm font-bold",
+              active ? titleActive : "text-slate-900"
+            )}
+          >
             {title}
           </div>
           <div className="mt-1 text-xs text-slate-500">{text}</div>
@@ -1336,10 +1499,13 @@ function TravelerRow({
   );
 }
 
-function TopHeroStat({ label, value }) {
+function TopHeroStat({ icon, label, value }) {
   return (
     <div className="rounded-[1.25rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">
+        {icon}
+      </div>
+      <div className="mt-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
         {label}
       </div>
       <div className="mt-2 text-sm font-bold text-slate-900">{value}</div>
