@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import {
+  CalendarDays,
+  Clock3,
+  FilePenLine,
+  MapPinned,
+  Sparkles,
+} from "lucide-react";
 import { api } from "../api/client.js";
 import {
   Alert,
@@ -31,6 +38,9 @@ const BLOCK_META = {
   },
 };
 
+const textareaClassName =
+  "min-h-28 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100";
+
 function makeEmptyActivity() {
   return {
     title: "",
@@ -44,8 +54,30 @@ function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
-function deepClone(value) {
-  return JSON.parse(JSON.stringify(value));
+function mapActivityForForm(activity) {
+  return {
+    title: activity?.title || "",
+    location: activity?.location || "",
+    notes: activity?.notes || "",
+    durationHours:
+      activity?.durationHours === null || activity?.durationHours === undefined
+        ? ""
+        : String(activity.durationHours),
+  };
+}
+
+function mapActivityForSave(activity) {
+  return {
+    title: (activity?.title || "").trim(),
+    location: (activity?.location || "").trim(),
+    notes: (activity?.notes || "").trim(),
+    durationHours:
+      activity?.durationHours === "" ||
+      activity?.durationHours === null ||
+      activity?.durationHours === undefined
+        ? null
+        : Number(activity.durationHours),
+  };
 }
 
 function normalizeTripForForm(trip) {
@@ -83,33 +115,9 @@ function normalizeTripForForm(trip) {
         day: day?.day ?? index + 1,
         title: day?.title || "",
         date: day?.date || "",
-        morning: safeArray(day?.morning).map((a) => ({
-          title: a?.title || "",
-          location: a?.location || "",
-          notes: a?.notes || "",
-          durationHours:
-            a?.durationHours === null || a?.durationHours === undefined
-              ? ""
-              : String(a.durationHours),
-        })),
-        afternoon: safeArray(day?.afternoon).map((a) => ({
-          title: a?.title || "",
-          location: a?.location || "",
-          notes: a?.notes || "",
-          durationHours:
-            a?.durationHours === null || a?.durationHours === undefined
-              ? ""
-              : String(a.durationHours),
-        })),
-        evening: safeArray(day?.evening).map((a) => ({
-          title: a?.title || "",
-          location: a?.location || "",
-          notes: a?.notes || "",
-          durationHours:
-            a?.durationHours === null || a?.durationHours === undefined
-              ? ""
-              : String(a.durationHours),
-        })),
+        morning: safeArray(day?.morning).map(mapActivityForForm),
+        afternoon: safeArray(day?.afternoon).map(mapActivityForForm),
+        evening: safeArray(day?.evening).map(mapActivityForForm),
         foodSuggestion: day?.foodSuggestion || "",
         backupPlan: day?.backupPlan || "",
       })),
@@ -126,26 +134,15 @@ function normalizeDayNumbers(days) {
 }
 
 function countDayActivities(day) {
-  return (
-    safeArray(day?.morning).length +
-    safeArray(day?.afternoon).length +
-    safeArray(day?.evening).length
-  );
+  return BLOCKS.reduce((sum, block) => sum + safeArray(day?.[block]).length, 0);
 }
 
 function getDayEstimatedHours(day) {
-  const activities = [
-    ...safeArray(day?.morning),
-    ...safeArray(day?.afternoon),
-    ...safeArray(day?.evening),
-  ];
-
-  const total = activities.reduce((sum, activity) => {
+  const activities = BLOCKS.flatMap((block) => safeArray(day?.[block]));
+  return activities.reduce((sum, activity) => {
     const n = Number(activity?.durationHours);
     return Number.isFinite(n) && n > 0 ? sum + n : sum;
   }, 0);
-
-  return total;
 }
 
 function formatHours(value) {
@@ -154,10 +151,77 @@ function formatHours(value) {
   return `${value.toFixed(1)}h`;
 }
 
+function isActivityEmpty(activity) {
+  return !(
+    (activity?.title || "").trim() ||
+    (activity?.location || "").trim() ||
+    (activity?.notes || "").trim() ||
+    String(activity?.durationHours || "").trim()
+  );
+}
+
+function TextareaField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  className = "",
+}) {
+  return (
+    <label className="block">
+      <div className="mb-2 text-sm font-semibold text-slate-700">{label}</div>
+      <textarea
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`${textareaClassName} ${className}`}
+      />
+    </label>
+  );
+}
+
+function MiniInfo({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-bold text-slate-900">{value}</div>
+    </div>
+  );
+}
+
+function HeroStat({ icon, title, value, subtitle }) {
+  return (
+    <div className="rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">
+        {icon}
+      </div>
+      <div className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+        {title}
+      </div>
+      <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+        {value}
+      </div>
+      <div className="mt-1 text-sm text-slate-500">{subtitle}</div>
+    </div>
+  );
+}
+
+function SideInfo({ title, text }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="text-sm font-bold text-slate-900">{title}</div>
+      <div className="mt-1 text-sm leading-6 text-slate-600">{text}</div>
+    </div>
+  );
+}
+
 export default function EditTrip() {
-    useEffect(() => {
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
   const nav = useNavigate();
   const { id } = useParams();
 
@@ -174,6 +238,7 @@ export default function EditTrip() {
     (async () => {
       setLoading(true);
       setErr("");
+      setSuccess("");
 
       try {
         const { data } = await api.get(`/trips/${id}`);
@@ -217,7 +282,10 @@ export default function EditTrip() {
     const s = new Date(form.startDate);
     const e = new Date(form.endDate);
 
-    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || s > e) return null;
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || s > e) {
+      return null;
+    }
+
     return Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
   }, [form?.startDate, form?.endDate]);
 
@@ -231,10 +299,18 @@ export default function EditTrip() {
     return form.itinerary.days.reduce((sum, day) => sum + getDayEstimatedHours(day), 0);
   }, [form]);
 
-  function updateDay(dayIndex, field, value) {
+  function updateForm(updater) {
     setForm((prev) => {
+      if (!prev) return prev;
+      return updater(prev);
+    });
+  }
+
+  function updateDay(dayIndex, field, value) {
+    updateForm((prev) => {
       const days = [...prev.itinerary.days];
       days[dayIndex] = { ...days[dayIndex], [field]: value };
+
       return {
         ...prev,
         itinerary: { ...prev.itinerary, days },
@@ -243,10 +319,10 @@ export default function EditTrip() {
   }
 
   function updateActivity(dayIndex, block, activityIndex, field, value) {
-    setForm((prev) => {
+    updateForm((prev) => {
       const days = [...prev.itinerary.days];
       const day = { ...days[dayIndex] };
-      const activities = [...day[block]];
+      const activities = [...safeArray(day[block])];
 
       activities[activityIndex] = {
         ...activities[activityIndex],
@@ -264,10 +340,11 @@ export default function EditTrip() {
   }
 
   function addActivity(dayIndex, block) {
-    setForm((prev) => {
+    updateForm((prev) => {
       const days = [...prev.itinerary.days];
       const day = { ...days[dayIndex] };
-      day[block] = [...day[block], makeEmptyActivity()];
+
+      day[block] = [...safeArray(day[block]), makeEmptyActivity()];
       days[dayIndex] = day;
 
       return {
@@ -278,10 +355,11 @@ export default function EditTrip() {
   }
 
   function removeActivity(dayIndex, block, activityIndex) {
-    setForm((prev) => {
+    updateForm((prev) => {
       const days = [...prev.itinerary.days];
       const day = { ...days[dayIndex] };
-      day[block] = day[block].filter((_, i) => i !== activityIndex);
+
+      day[block] = safeArray(day[block]).filter((_, i) => i !== activityIndex);
       days[dayIndex] = day;
 
       return {
@@ -291,13 +369,11 @@ export default function EditTrip() {
     });
   }
 
-
-
   function moveActivityWithinBlock(dayIndex, block, activityIndex, direction) {
-    setForm((prev) => {
+    updateForm((prev) => {
       const days = [...prev.itinerary.days];
       const day = { ...days[dayIndex] };
-      const activities = [...day[block]];
+      const activities = [...safeArray(day[block])];
       const targetIndex = direction === "up" ? activityIndex - 1 : activityIndex + 1;
 
       if (targetIndex < 0 || targetIndex >= activities.length) return prev;
@@ -326,12 +402,12 @@ export default function EditTrip() {
 
     const targetBlock = BLOCKS[targetBlockIndex];
 
-    setForm((prev) => {
+    updateForm((prev) => {
       const days = [...prev.itinerary.days];
       const day = { ...days[dayIndex] };
 
-      const fromActivities = [...day[block]];
-      const toActivities = [...day[targetBlock]];
+      const fromActivities = [...safeArray(day[block])];
+      const toActivities = [...safeArray(day[targetBlock])];
       const [movedActivity] = fromActivities.splice(activityIndex, 1);
 
       if (!movedActivity) return prev;
@@ -350,7 +426,7 @@ export default function EditTrip() {
   }
 
   function moveDay(dayIndex, direction) {
-    setForm((prev) => {
+    updateForm((prev) => {
       const days = [...prev.itinerary.days];
       const targetIndex = direction === "up" ? dayIndex - 1 : dayIndex + 1;
 
@@ -368,21 +444,13 @@ export default function EditTrip() {
     });
   }
 
-
-
   function removeEmptyActivitiesFromDay(dayIndex) {
-    setForm((prev) => {
+    updateForm((prev) => {
       const days = [...prev.itinerary.days];
       const day = { ...days[dayIndex] };
 
       for (const block of BLOCKS) {
-        day[block] = safeArray(day[block]).filter(
-          (a) =>
-            (a?.title || "").trim() ||
-            (a?.location || "").trim() ||
-            (a?.notes || "").trim() ||
-            String(a?.durationHours || "").trim()
-        );
+        day[block] = safeArray(day[block]).filter((activity) => !isActivityEmpty(activity));
       }
 
       days[dayIndex] = day;
@@ -402,7 +470,7 @@ export default function EditTrip() {
     setErr("");
     setSuccess("");
 
-    if (!form.destination.trim()) {
+    if (!form?.destination.trim()) {
       setErr("Please enter a destination.");
       return;
     }
@@ -420,33 +488,9 @@ export default function EditTrip() {
           ...day,
           title: (day.title || "").trim(),
           date: day.date || "",
-          morning: safeArray(day.morning).map((a) => ({
-            title: (a.title || "").trim(),
-            location: (a.location || "").trim(),
-            notes: (a.notes || "").trim(),
-            durationHours:
-              a.durationHours === "" || a.durationHours === null || a.durationHours === undefined
-                ? null
-                : Number(a.durationHours),
-          })),
-          afternoon: safeArray(day.afternoon).map((a) => ({
-            title: (a.title || "").trim(),
-            location: (a.location || "").trim(),
-            notes: (a.notes || "").trim(),
-            durationHours:
-              a.durationHours === "" || a.durationHours === null || a.durationHours === undefined
-                ? null
-                : Number(a.durationHours),
-          })),
-          evening: safeArray(day.evening).map((a) => ({
-            title: (a.title || "").trim(),
-            location: (a.location || "").trim(),
-            notes: (a.notes || "").trim(),
-            durationHours:
-              a.durationHours === "" || a.durationHours === null || a.durationHours === undefined
-                ? null
-                : Number(a.durationHours),
-          })),
+          morning: safeArray(day.morning).map(mapActivityForSave),
+          afternoon: safeArray(day.afternoon).map(mapActivityForSave),
+          evening: safeArray(day.evening).map(mapActivityForSave),
           foodSuggestion: (day.foodSuggestion || "").trim(),
           backupPlan: (day.backupPlan || "").trim(),
         }))
@@ -476,8 +520,18 @@ export default function EditTrip() {
 
       await api.put(`/trips/${id}`, payload);
 
+      const normalizedSavedForm = {
+        ...form,
+        destination: payload.destination,
+        destinations: payload.destinations,
+        preferences: payload.preferences,
+        itinerary: payload.itinerary,
+        events: payload.events,
+      };
+
+      setForm(normalizedSavedForm);
+      setInitialSnapshot(JSON.stringify(normalizedSavedForm));
       setSuccess("Trip updated successfully.");
-      setInitialSnapshot(JSON.stringify(form));
 
       setTimeout(() => {
         nav(`/trip/${id}`);
@@ -491,15 +545,21 @@ export default function EditTrip() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-5xl">
-        <Card className="overflow-hidden">
+      <div className="space-y-6">
+        <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+          <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-indigo-50" />
+          <div className="relative p-6 lg:p-8">
+            <div className="h-7 w-40 animate-pulse rounded bg-slate-200" />
+            <div className="mt-4 h-10 w-72 animate-pulse rounded bg-slate-200" />
+            <div className="mt-4 h-20 animate-pulse rounded-3xl bg-slate-100" />
+          </div>
+        </section>
+
+        <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
           <CardBody className="space-y-4">
-            <div className="h-8 w-56 animate-pulse rounded bg-slate-200" />
-            <div className="h-28 animate-pulse rounded-3xl bg-slate-100" />
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="h-52 animate-pulse rounded-3xl bg-slate-100" />
-              <div className="h-52 animate-pulse rounded-3xl bg-slate-100" />
-            </div>
+            <div className="h-12 animate-pulse rounded-2xl bg-slate-100" />
+            <div className="h-56 animate-pulse rounded-3xl bg-slate-100" />
+            <div className="h-56 animate-pulse rounded-3xl bg-slate-100" />
           </CardBody>
         </Card>
       </div>
@@ -518,142 +578,187 @@ export default function EditTrip() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <Card className="overflow-hidden border-slate-200 shadow-[0_24px_80px_-30px_rgba(15,23,42,0.28)]">
-        <div className="relative overflow-hidden bg-linear-to-r from-sky-700 via-blue-700 to-indigo-800 px-6 py-7 text-white sm:px-8">
-          <div className="absolute -left-10 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute bottom-0 right-0 h-52 w-52 rounded-full bg-cyan-300/10 blur-3xl" />
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.18)]">
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-50 via-white to-indigo-50" />
+        <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-sky-200/30 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-indigo-200/30 blur-3xl" />
 
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur">
-                Manual trip editor
+        <div className="relative grid gap-6 p-6 lg:grid-cols-12 lg:p-8">
+          <div className="lg:col-span-8">
+            <Badge className="border-sky-200 bg-sky-50 text-sky-700">
+              Manual Trip Editor
+            </Badge>
+
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+              {form?.destination || "Edit Trip"}
+            </h1>
+
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
+              Reorder days, move activities between sections, and refine your
+              itinerary in a cleaner and more premium editing experience.
+            </p>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <HeroStat
+                icon={<CalendarDays size={18} />}
+                title="Days"
+                value={daysCount || safeArray(form?.itinerary?.days).length}
+                subtitle="Organized day by day"
+              />
+              <HeroStat
+                icon={<MapPinned size={18} />}
+                title="Activities"
+                value={totalActivities}
+                subtitle="Manage all stops and plans"
+              />
+              <HeroStat
+                icon={<Clock3 size={18} />}
+                title="Estimated"
+                value={formatHours(totalEstimatedHours)}
+                subtitle="Total planned time"
+              />
+            </div>
+          </div>
+
+          <div className="lg:col-span-4">
+            <div className="rounded-[1.75rem] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur">
+              <div className="text-sm font-bold text-slate-900">
+                Editing status
               </div>
 
-              <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
-                {form.destination || "Edit Trip"}
-              </h1>
-
-              <p className="mt-3 text-sm leading-6 text-white/85 sm:text-base">
-                Reorder days, move activities between plans, and enrich your itinerary with notes and durations.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {daysCount ? (
-                <Badge className="border-white/20 bg-white/10 text-white">
-                  {daysCount} days
-                </Badge>
-              ) : null}
-              <Badge className="border-white/20 bg-white/10 text-white">
-                {totalActivities} activities
-              </Badge>
-              <Badge className="border-white/20 bg-white/10 text-white">
-                {formatHours(totalEstimatedHours)}
-              </Badge>
-              <Badge className="border-white/20 bg-white/10 text-white">
-                {hasUnsavedChanges ? "Unsaved changes" : "Saved state"}
-              </Badge>
+              <div className="mt-4 grid gap-3">
+                <SideInfo
+                  title="Current state"
+                  text={hasUnsavedChanges ? "You have unsaved changes." : "All changes are saved."}
+                />
+                <SideInfo
+                  title="Protected content"
+                  text="Recommended places, tips, and events remain preserved while editing."
+                />
+                <SideInfo
+                  title="Flexible editing"
+                  text="Move activities up, down, or across morning, afternoon, and evening."
+                />
+              </div>
             </div>
           </div>
         </div>
-      </Card>
+      </section>
 
       {err ? <Alert type="error">{err}</Alert> : null}
       {success ? <Alert type="success">{success}</Alert> : null}
 
-      <form onSubmit={saveTrip} className="grid gap-6 lg:grid-cols-12">
-        <div className="space-y-6 lg:col-span-4">
-          <div className="lg:sticky lg:top-6 lg:space-y-6">
-            <Card>
-              <CardHeader
-                title="Actions"
-                subtitle="Save your changes or go back to the trip page"
-              />
-              <CardBody className="space-y-3">
-                <Button type="submit" disabled={saving} className="w-full">
-                  {saving ? "Saving changes..." : "Save Changes"}
-                </Button>
+      <div className="grid gap-6 xl:grid-cols-12">
+        <div className="space-y-6 xl:col-span-4">
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
+            <CardHeader
+              title="Actions"
+              subtitle="Save your updates or leave the editor"
+            />
+            <CardBody className="space-y-4 bg-gradient-to-b from-white to-slate-50/60">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-5">
+                  <div className="text-lg font-bold text-slate-900">
+                    Trip actions
+                  </div>
+                  <div className="text-sm text-slate-500">
+                    Manage your current editing session
+                  </div>
+                </div>
 
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => nav(`/trip/${id}`)}
-                >
-                  Cancel
-                </Button>
+                <div className="space-y-3">
+                  <Button type="button" disabled={saving} className="w-full" onClick={saveTrip}>
+                    {saving ? "Saving changes..." : "Save Changes"}
+                  </Button>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => nav("/trips")}
-                >
-                  Back to My Trips
-                </Button>
-              </CardBody>
-            </Card>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => nav(`/trip/${id}`)}
+                  >
+                    Cancel
+                  </Button>
 
-            <Card>
-              <CardHeader
-                title="Protected content"
-                subtitle="These are preserved when you edit the trip"
-              />
-              <CardBody className="space-y-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => nav("/trips")}
+                  >
+                    Back to My Trips
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                Edit titles, dates, durations, notes, food suggestions, and backup
+                plans while keeping the trip structure clean and organized.
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
+            <CardHeader
+              title="Editor summary"
+              subtitle="Quick trip edit overview"
+            />
+            <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
+              <div className="space-y-4">
+                <MiniInfo label="Days" value={safeArray(form?.itinerary?.days).length} />
+                <MiniInfo label="Activities" value={totalActivities} />
+                <MiniInfo label="Estimated Hours" value={formatHours(totalEstimatedHours)} />
+                <MiniInfo
+                  label="Status"
+                  value={hasUnsavedChanges ? "Editing..." : "Saved"}
+                />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
+            <CardHeader
+              title="Protected content"
+              subtitle="These parts stay preserved"
+            />
+            <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
+              <div className="space-y-4">
                 <MiniInfo
                   label="Recommended Places"
                   value={safeArray(form?.itinerary?.recommendedPlaces).length}
                 />
-                <MiniInfo
-                  label="Tips"
-                  value={safeArray(form?.itinerary?.tips).length}
-                />
-                <MiniInfo
-                  label="Events"
-                  value={safeArray(form?.events).length}
-                />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Editor tools"
-                subtitle="Quick summary of your current edit state"
-              />
-              <CardBody className="space-y-3">
-                <MiniInfo label="Days" value={safeArray(form?.itinerary?.days).length} />
-                <MiniInfo label="Total Activities" value={totalActivities} />
-                <MiniInfo label="Estimated Hours" value={formatHours(totalEstimatedHours)} />
-                <MiniInfo
-                  label="Status"
-                  value={hasUnsavedChanges ? "Editing..." : "No pending changes"}
-                />
-              </CardBody>
-            </Card>
-          </div>
+                <MiniInfo label="Tips" value={safeArray(form?.itinerary?.tips).length} />
+                <MiniInfo label="Events" value={safeArray(form?.events).length} />
+              </div>
+            </CardBody>
+          </Card>
         </div>
 
-        <div className="space-y-6 lg:col-span-8">
-          {form.itinerary.days.map((day, dayIndex) => {
+        <form onSubmit={saveTrip} className="space-y-6 xl:col-span-8">
+          {safeArray(form?.itinerary?.days).map((day, dayIndex) => {
             const dayActivities = countDayActivities(day);
             const dayHours = getDayEstimatedHours(day);
 
             return (
               <Card
                 key={dayIndex}
-                className="overflow-hidden border border-slate-200 shadow-sm transition duration-300 hover:shadow-md"
+                className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]"
               >
-                <div className="bg-linear-to-r from-slate-900 to-slate-800 p-5 text-white">
-                  <div className="flex flex-col gap-4">
+                <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-5 text-white">
+                  <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-white/5 blur-3xl" />
+
+                  <div className="relative flex flex-col gap-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-white/75">
+                        <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">
                           Day {day.day}
                         </div>
-                        <div className="mt-1 text-xl font-black">Edit day plan</div>
-                        <div className="mt-1 text-sm text-white/75">
-                          Refine activities, titles, day details, durations, and notes
+                        <div className="mt-1 text-2xl font-black tracking-tight">
+                          Edit day plan
+                        </div>
+                        <div className="mt-1 text-sm leading-6 text-white/75">
+                          Refine the schedule, reorder activities, and improve the plan details.
                         </div>
                       </div>
 
@@ -691,7 +796,7 @@ export default function EditTrip() {
                       <Button
                         type="button"
                         variant="ghost"
-                        className="px-3 py-2 text-xs"
+                        className="bg-white/5 px-3 py-2 text-xs text-white hover:bg-white/10"
                         onClick={() => removeEmptyActivitiesFromDay(dayIndex)}
                       >
                         Clean empty activities
@@ -700,40 +805,52 @@ export default function EditTrip() {
                   </div>
                 </div>
 
-                <CardBody className="space-y-5">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Input
-                      label="Day title"
-                      placeholder="e.g. Historic center and local food"
-                      value={day.title}
-                      onChange={(e) => updateDay(dayIndex, "title", e.target.value)}
-                    />
-                    <Input
-                      label="Day date"
-                      type="date"
-                      value={day.date}
-                      onChange={(e) => updateDay(dayIndex, "date", e.target.value)}
-                    />
+                <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="mb-5">
+                      <div className="text-lg font-bold text-slate-900">
+                        Day details
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        Set the day title and calendar date
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Input
+                        label="Day title"
+                        placeholder="e.g. Historic center and local food"
+                        value={day.title}
+                        onChange={(e) => updateDay(dayIndex, "title", e.target.value)}
+                      />
+                      <Input
+                        label="Day date"
+                        type="date"
+                        value={day.date}
+                        onChange={(e) => updateDay(dayIndex, "date", e.target.value)}
+                      />
+                    </div>
                   </div>
 
                   {BLOCKS.map((block) => {
                     const meta = BLOCK_META[block];
+                    const activities = safeArray(day[block]);
 
                     return (
                       <div
                         key={block}
-                        className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4"
+                        className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
                       >
-                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                               <span>{meta.icon}</span>
                               {meta.title}
-                              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                                {safeArray(day[block]).length}
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                                {activities.length}
                               </span>
                             </div>
-                            <div className="mt-1 text-xs text-slate-500">{meta.desc}</div>
+                            <div className="mt-1 text-sm text-slate-500">{meta.desc}</div>
                           </div>
 
                           <Button
@@ -746,20 +863,20 @@ export default function EditTrip() {
                           </Button>
                         </div>
 
-                        <div className="space-y-3">
-                          {day[block].length === 0 ? (
-                            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
+                        <div className="space-y-4">
+                          {activities.length === 0 ? (
+                            <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
                               No activities yet in this block.
                             </div>
                           ) : (
-                            day[block].map((activity, activityIndex) => (
+                            activities.map((activity, activityIndex) => (
                               <div
                                 key={`${block}-${activityIndex}`}
-                                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                                className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4"
                               >
-                                <div className="mb-3 flex flex-col gap-3">
+                                <div className="mb-4 flex flex-col gap-3">
                                   <div className="flex items-center justify-between gap-3">
-                                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                                       Activity {activityIndex + 1}
                                     </div>
 
@@ -805,7 +922,7 @@ export default function EditTrip() {
                                           "down"
                                         )
                                       }
-                                      disabled={activityIndex === day[block].length - 1}
+                                      disabled={activityIndex === activities.length - 1}
                                     >
                                       ↓ Down
                                     </Button>
@@ -843,7 +960,6 @@ export default function EditTrip() {
                                     >
                                       Next plan →
                                     </Button>
-
                                   </div>
                                 </div>
 
@@ -897,25 +1013,20 @@ export default function EditTrip() {
                                     }
                                   />
 
-                                  <label className="block">
-                                    <div className="mb-1.5 text-sm font-semibold text-slate-700">
-                                      Notes
-                                    </div>
-                                    <textarea
-                                      value={activity.notes}
-                                      onChange={(e) =>
-                                        updateActivity(
-                                          dayIndex,
-                                          block,
-                                          activityIndex,
-                                          "notes",
-                                          e.target.value
-                                        )
-                                      }
-                                      placeholder="Extra notes, reminders, or advice..."
-                                      className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                                    />
-                                  </label>
+                                  <TextareaField
+                                    label="Notes"
+                                    value={activity.notes}
+                                    onChange={(e) =>
+                                      updateActivity(
+                                        dayIndex,
+                                        block,
+                                        activityIndex,
+                                        "notes",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Extra notes, reminders, or advice..."
+                                  />
                                 </div>
                               </div>
                             ))
@@ -926,47 +1037,36 @@ export default function EditTrip() {
                   })}
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="block">
-                      <div className="mb-1.5 text-sm font-semibold text-slate-700">
-                        Food Suggestion
-                      </div>
-                      <textarea
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <TextareaField
+                        label="Food Suggestion"
                         value={day.foodSuggestion}
                         onChange={(e) => updateDay(dayIndex, "foodSuggestion", e.target.value)}
                         placeholder="Recommended meal, restaurant style, or local specialty..."
-                        className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                       />
-                    </label>
+                    </div>
 
-                    <label className="block">
-                      <div className="mb-1.5 text-sm font-semibold text-slate-700">
-                        Backup Plan
-                      </div>
-                      <textarea
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <TextareaField
+                        label="Backup Plan"
                         value={day.backupPlan}
                         onChange={(e) => updateDay(dayIndex, "backupPlan", e.target.value)}
                         placeholder="Alternative idea in case of weather or time issues..."
-                        className="min-h-25 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                       />
-                    </label>
+                    </div>
                   </div>
                 </CardBody>
               </Card>
             );
           })}
-        </div>
-      </form>
-    </div>
-  );
-}
 
-function MiniInfo({ label, value }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-        {label}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={saving} className="min-w-40">
+              {saving ? "Saving changes..." : "Save Changes"}
+            </Button>
+          </div>
+        </form>
       </div>
-      <div className="text-sm font-semibold text-slate-800">{value}</div>
     </div>
   );
 }

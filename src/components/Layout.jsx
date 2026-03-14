@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { Button } from "../components/UI.jsx";
@@ -34,19 +34,30 @@ function NavItem({
   children,
   mobile = false,
   badgeCount = 0,
+  danger = false,
 }) {
   const base = mobile
     ? "flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold transition"
     : "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition";
 
-  const idle = "text-slate-700 hover:bg-sky-50 hover:text-sky-700";
+  const idle = danger
+    ? mobile
+      ? "text-rose-700 hover:bg-rose-50 hover:text-rose-700"
+      : "text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+    : "text-slate-700 hover:bg-sky-50 hover:text-sky-700";
+
   const active = mobile
     ? "bg-sky-600 text-white shadow-sm"
     : "bg-sky-600 text-white shadow-sm hover:bg-sky-600";
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={cx(base, idle)}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cx(base, idle)}
+        aria-label={typeof children === "string" ? children : undefined}
+      >
         <span>{children}</span>
         <NavBadge count={badgeCount} mobile={mobile} />
       </button>
@@ -98,6 +109,7 @@ function MobileMenuButton({ open, onClick }) {
       onClick={onClick}
       aria-label={open ? "Close menu" : "Open menu"}
       aria-expanded={open}
+      aria-controls="mobile-menu"
       className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 md:hidden"
     >
       <div className="relative h-5 w-5">
@@ -126,13 +138,11 @@ function MobileMenuButton({ open, onClick }) {
 
 function UserPill({ user }) {
   return (
-    <div className="hidden xl:flex items-center gap-2 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+    <div className="hidden items-center gap-2 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm xl:flex">
       <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white">
-        {(user?.name || "T").trim().charAt(0).toUpperCase()}
+        {String(user?.name || "T").trim().charAt(0).toUpperCase()}
       </span>
-      <span className="max-w-35 truncate">
-        Welcome, {user?.name || "Traveler"}
-      </span>
+      <span className="max-w-35 truncate">Welcome, {user?.name || "Traveler"}</span>
     </div>
   );
 }
@@ -160,7 +170,6 @@ function FooterExternalLink({ href, children }) {
     </a>
   );
 }
-
 
 function Footer({ isLoggedIn, isAdmin }) {
   return (
@@ -224,19 +233,19 @@ function Footer({ isLoggedIn, isAdmin }) {
           </div>
 
           <div>
-              <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
-                Support
-              </h3>
-              <div className="mt-4 flex flex-col gap-3">
-                <FooterLink to="/contact">Contact Support</FooterLink>
-                <FooterLink to="/faq">FAQ</FooterLink>
-                <FooterLink to="/privacy">Privacy Policy</FooterLink>
-                <FooterLink to="/terms">Terms of Service</FooterLink>
-                <FooterExternalLink href={DEVELOPER_LINKEDIN}>
-                  Developer LinkedIn
-                </FooterExternalLink>
-              </div>
+            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
+              Support
+            </h3>
+            <div className="mt-4 flex flex-col gap-3">
+              <FooterLink to="/contact">Contact Support</FooterLink>
+              <FooterLink to="/faq">FAQ</FooterLink>
+              <FooterLink to="/privacy">Privacy Policy</FooterLink>
+              <FooterLink to="/terms">Terms of Service</FooterLink>
+              <FooterExternalLink href={DEVELOPER_LINKEDIN}>
+                Developer LinkedIn
+              </FooterExternalLink>
             </div>
+          </div>
 
           <div>
             <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-900">
@@ -289,13 +298,13 @@ export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadReplyCount, setUnreadReplyCount] = useState(0);
 
-  const closeMobileMenu = () => setMobileOpen(false);
+  const isAdmin = user?.role === "admin";
 
-  useEffect(() => {
-    closeMobileMenu();
-  }, [location.pathname]);
+  const closeMobileMenu = useCallback(() => {
+    setMobileOpen(false);
+  }, []);
 
-  const loadUnreadReplyCount = async () => {
+  const loadUnreadReplyCount = useCallback(async () => {
     if (!isLoggedIn) {
       setUnreadReplyCount(0);
       return;
@@ -307,19 +316,22 @@ export default function Layout({ children }) {
     } catch {
       setUnreadReplyCount(0);
     }
-  };
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    closeMobileMenu();
+  }, [location.pathname, closeMobileMenu]);
 
   useEffect(() => {
     loadUnreadReplyCount();
+  }, [loadUnreadReplyCount]);
 
+  useEffect(() => {
     if (!isLoggedIn) return;
 
-    const timer = setInterval(() => {
-      loadUnreadReplyCount();
-    }, 20000);
-
+    const timer = setInterval(loadUnreadReplyCount, 20000);
     return () => clearInterval(timer);
-  }, [isLoggedIn, location.pathname]);
+  }, [isLoggedIn, loadUnreadReplyCount]);
 
   const onLogout = async () => {
     closeMobileMenu();
@@ -328,36 +340,45 @@ export default function Layout({ children }) {
     navigate("/login");
   };
 
-  const isAdmin = user?.role === "admin";
+  const loggedInNavItems = [
+    { to: "/", label: "Home" },
+    { to: "/create", label: "Create Trip" },
+    { to: "/trips", label: "My Trips" },
+    { to: "/contact", label: "Contact" },
+    { to: "/profile", label: "Profile", badgeCount: unreadReplyCount },
+  ];
+
+  const guestNavItems = [
+    { to: "/", label: "Home" },
+    { to: "/contact", label: "Contact" },
+    { to: "/login", label: "Login" },
+    { to: "/register", label: "Register" },
+  ];
+
+  const desktopNavItems = isLoggedIn ? loggedInNavItems : guestNavItems;
 
   return (
     <div className="min-h-screen bg-linear-to-b from-sky-50 via-white to-slate-100">
-      <header className="sticky top-0 z-200 border-b border-slate-200/70 bg-white/85 shadow-[0_8px_30px_-20px_rgba(15,23,42,0.35)] backdrop-blur-xl supports-backdrop-filter:bg-white/75">
+      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/85 shadow-[0_8px_30px_-20px_rgba(15,23,42,0.35)] backdrop-blur-xl supports-backdrop-filter:bg-white/75">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <Brand />
 
             <div className="hidden items-center gap-3 md:flex">
               <nav className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-white/90 p-1.5 shadow-sm">
-                {isLoggedIn ? (
-                  <>
-                    <NavItem to="/">Home</NavItem>
-                    <NavItem to="/create">Create Trip</NavItem>
-                    <NavItem to="/trips">My Trips</NavItem>
-                    <NavItem to="/contact">Contact</NavItem>
-                    <NavItem to="/profile" badgeCount={unreadReplyCount}>
-                      Profile
-                    </NavItem>
-                    {isAdmin ? <NavItem to="/admin/contacts">Admin</NavItem> : null}
-                  </>
-                ) : (
-                  <>
-                    <NavItem to="/">Home</NavItem>
-                    <NavItem to="/contact">Contact</NavItem>
-                    <NavItem to="/login">Login</NavItem>
-                    <NavItem to="/register">Register</NavItem>
-                  </>
-                )}
+                {desktopNavItems.map((item) => (
+                  <NavItem
+                    key={item.to}
+                    to={item.to}
+                    badgeCount={item.badgeCount || 0}
+                  >
+                    {item.label}
+                  </NavItem>
+                ))}
+
+                {isLoggedIn && isAdmin ? (
+                  <NavItem to="/admin/contacts">Admin</NavItem>
+                ) : null}
               </nav>
 
               {isLoggedIn ? (
@@ -385,9 +406,10 @@ export default function Layout({ children }) {
         </div>
 
         <div
+          id="mobile-menu"
           className={cx(
             "overflow-hidden border-t border-slate-200 bg-white/95 backdrop-blur-xl transition-all duration-300 md:hidden",
-            mobileOpen ? "max-h-175 opacity-100" : "max-h-0 opacity-0"
+            mobileOpen ? "max-h-[700px] opacity-100" : "max-h-0 opacity-0"
           )}
         >
           <div className="mx-auto max-w-7xl space-y-3 px-4 py-4 sm:px-6">
@@ -411,47 +433,29 @@ export default function Layout({ children }) {
             )}
 
             <nav className="grid gap-2">
+              {(isLoggedIn ? loggedInNavItems : guestNavItems).map((item) => (
+                <NavItem
+                  key={item.to}
+                  to={item.to}
+                  mobile
+                  badgeCount={item.badgeCount || 0}
+                >
+                  {item.label}
+                </NavItem>
+              ))}
+
+              {isLoggedIn && isAdmin ? (
+                <NavItem to="/admin/contacts" mobile>
+                  Admin Contacts
+                </NavItem>
+              ) : null}
+
               {isLoggedIn ? (
-                <>
-                  <NavItem to="/" mobile>
-                    Home
-                  </NavItem>
-                  <NavItem to="/create" mobile>
-                    Create Trip
-                  </NavItem>
-                  <NavItem to="/trips" mobile>
-                    My Trips
-                  </NavItem>
-                  <NavItem to="/contact" mobile>
-                    Contact
-                  </NavItem>
-                  <NavItem to="/profile" mobile badgeCount={unreadReplyCount}>
-                    Profile
-                  </NavItem>
-                  {isAdmin ? (
-                    <NavItem to="/admin/contacts" mobile>
-                      Admin Contacts
-                    </NavItem>
-                  ) : null}
-                  <NavItem onClick={onLogout} mobile>
-                    Logout
-                  </NavItem>
-                </>
+                <NavItem onClick={onLogout} mobile danger>
+                  Logout
+                </NavItem>
               ) : (
                 <>
-                  <NavItem to="/" mobile>
-                    Home
-                  </NavItem>
-                  <NavItem to="/contact" mobile>
-                    Contact
-                  </NavItem>
-                  <NavItem to="/login" mobile>
-                    Login
-                  </NavItem>
-                  <NavItem to="/register" mobile>
-                    Register
-                  </NavItem>
-
                   <div className="pt-2">
                     <Link
                       to="/create"
@@ -477,7 +481,7 @@ export default function Layout({ children }) {
       </header>
 
       {isLoggedIn && user && !user.verified && (
-        <div className="relative z-190 border-b border-amber-300 bg-linear-to-r from-amber-50 to-yellow-50">
+        <div className="relative z-40 border-b border-amber-300 bg-linear-to-r from-amber-50 to-yellow-50">
           <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-3 text-center text-sm font-semibold text-amber-800 sm:px-6">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-xs">
               !
