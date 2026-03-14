@@ -1,113 +1,51 @@
 import { useState, useEffect, useMemo } from "react";
 import { api } from "../api/client.js";
 import { useAuth } from "../auth/AuthProvider";
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Input,
-} from "../components/UI.jsx";
-import {
-  LifeBuoy,
-  Mail,
-  MessageSquareText,
-  Send,
-  Sparkles,
-  User,
-} from "lucide-react";
+import { Alert, Badge, Button, Card, CardBody, CardHeader, Input } from "../components/UI.jsx";
+import { LifeBuoy, Mail, MessageSquareText, Send, Sparkles, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 function countWords(value) {
-  return String(value || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+  return String(value || "").trim().split(/\s+/).filter(Boolean).length;
 }
 
 export default function Contact() {
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+  const { t } = useTranslation();
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const { user } = useAuth();
-
-  const [form, setForm] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-    subject: "",
-    message: "",
-  });
-
+  const [form, setForm] = useState({ name: user?.name || "", email: user?.email || "", subject: "", message: "" });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
 
   useEffect(() => {
-    setForm((prev) => ({
-      ...prev,
-      name: user?.name || prev.name,
-      email: user?.email || prev.email,
-    }));
+    setForm((prev) => ({ ...prev, name: user?.name || prev.name, email: user?.email || prev.email }));
   }, [user]);
 
-  function updateField(key, value) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
+  function updateField(key, value) { setForm((prev) => ({ ...prev, [key]: value })); }
 
   const subjectLength = form.subject.trim().length;
   const messageLength = form.message.trim().length;
   const messageWords = countWords(form.message);
 
-  const canSubmit = useMemo(() => {
-    return (
-      !loading &&
-      form.name.trim().length > 0 &&
-      form.email.trim().length > 0 &&
-      form.subject.trim().length > 0 &&
-      form.message.trim().length > 0
-    );
-  }, [form, loading]);
+  const canSubmit = useMemo(() => !loading && form.name.trim().length > 0 && form.email.trim().length > 0 && form.subject.trim().length > 0 && form.message.trim().length > 0, [form, loading]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setMsg(null);
 
     if (!form.name.trim() || !form.email.trim() || !form.subject.trim() || !form.message.trim()) {
-      setMsg({
-        type: "error",
-        text: "Please fill in all fields before sending your message.",
-      });
+      setMsg({ type: "error", text: t("contact.errors.fillAllFields") });
       return;
     }
 
     setLoading(true);
-
     try {
-      const { data } = await api.post("/contact", {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        subject: form.subject.trim(),
-        message: form.message.trim(),
-      });
-
-      setMsg({
-        type: "success",
-        text: data?.message || "Message sent successfully. We’ll reply soon.",
-      });
-
-      setForm((prev) => ({
-        ...prev,
-        subject: "",
-        message: "",
-      }));
+      const { data } = await api.post("/contact", { name: form.name.trim(), email: form.email.trim(), subject: form.subject.trim(), message: form.message.trim() });
+      setMsg({ type: "success", text: data?.message || t("contact.errors.messageSent") });
+      setForm((prev) => ({ ...prev, subject: "", message: "" }));
     } catch (err) {
-      setMsg({
-        type: "error",
-        text:
-          err?.response?.data?.message ||
-          "Failed to send message. Please try again.",
-      });
+      setMsg({ type: "error", text: err?.response?.data?.message || t("contact.errors.sendFailed") });
     } finally {
       setLoading(false);
     }
@@ -122,61 +60,24 @@ export default function Contact() {
 
         <div className="relative grid gap-6 p-6 lg:grid-cols-12 lg:p-8">
           <div className="lg:col-span-8">
-            <Badge className="border-sky-200 bg-sky-50 text-sky-700">
-              Support Center
-            </Badge>
-
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-              Contact our travel team
-            </h1>
-
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-              Need help with your itinerary, account, or planning experience?
-              Send us a message and admin replies will appear inside your profile
-              page so everything stays organized in one place.
-            </p>
+            <Badge className="border-sky-200 bg-sky-50 text-sky-700">{t("contact.badge")}</Badge>
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">{t("contact.title")}</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">{t("contact.description")}</p>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
-              <HeroStat
-                icon={<Sparkles size={18} />}
-                title="Trip help"
-                value="AI"
-                subtitle="Planner guidance"
-              />
-              <HeroStat
-                icon={<LifeBuoy size={18} />}
-                title="Support"
-                value="24/7"
-                subtitle="Message anytime"
-              />
-              <HeroStat
-                icon={<MessageSquareText size={18} />}
-                title="Replies"
-                value="Profile"
-                subtitle="Track responses"
-              />
+              <HeroStat icon={<Sparkles size={18} />} title={t("contact.stats.tripHelp")} value={t("contact.stats.ai")} subtitle={t("contact.stats.plannerGuidance")} />
+              <HeroStat icon={<LifeBuoy size={18} />} title={t("contact.stats.support")} value={t("contact.stats.support247")} subtitle={t("contact.stats.messageAnytime")} />
+              <HeroStat icon={<MessageSquareText size={18} />} title={t("contact.stats.replies")} value={t("contact.stats.profile")} subtitle={t("contact.stats.trackResponses")} />
             </div>
           </div>
 
           <div className="lg:col-span-4">
             <div className="rounded-[1.75rem] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur">
-              <div className="text-sm font-bold text-slate-900">
-                What can we help with?
-              </div>
-
+              <div className="text-sm font-bold text-slate-900">{t("contact.whatHelp.title")}</div>
               <div className="mt-4 grid gap-3">
-                <MiniInfo
-                  title="Trip planning help"
-                  text="Destinations, itinerary preferences, and travel ideas."
-                />
-                <MiniInfo
-                  title="Account support"
-                  text="Profile, login, verification, and account questions."
-                />
-                <MiniInfo
-                  title="Feature requests"
-                  text="Share improvements you want to see in the planner."
-                />
+                <MiniInfo title={t("contact.whatHelp.tripPlanning")} text={t("contact.whatHelp.tripPlanningText")} />
+                <MiniInfo title={t("contact.whatHelp.accountSupport")} text={t("contact.whatHelp.accountSupportText")} />
+                <MiniInfo title={t("contact.whatHelp.featureRequests")} text={t("contact.whatHelp.featureRequestsText")} />
               </div>
             </div>
           </div>
@@ -186,119 +87,59 @@ export default function Contact() {
       <div className="grid gap-6 xl:grid-cols-12">
         <div className="xl:col-span-8">
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
-            <CardHeader
-              title="Send us a message"
-              subtitle="We’d love to hear from you"
-            />
-
+            <CardHeader title={t("contact.form.title")} subtitle={t("contact.form.subtitle")} />
             <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               {msg ? <Alert type={msg.type}>{msg.text}</Alert> : null}
 
               <form onSubmit={onSubmit} className="space-y-6">
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-5 flex items-start gap-3">
-                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-sm">
-                      <User size={18} />
-                    </div>
-
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-sm"><User size={18} /></div>
                     <div>
-                      <div className="text-lg font-bold text-slate-900">
-                        Your information
-                      </div>
-                      <div className="text-sm text-slate-500">
-                        We’ll use these details for your support request
-                      </div>
+                      <div className="text-lg font-bold text-slate-900">{t("contact.form.yourInfo")}</div>
+                      <div className="text-sm text-slate-500">{t("contact.form.yourInfoSubtitle")}</div>
                     </div>
                   </div>
-
                   <div className="grid gap-4 md:grid-cols-2">
-                    <Input
-                      label="Name"
-                      placeholder="Your name"
-                      required
-                      value={form.name}
-                      onChange={(e) => updateField("name", e.target.value)}
-                    />
-                    <Input
-                      label="Email"
-                      type="email"
-                      placeholder="you@email.com"
-                      required
-                      value={form.email}
-                      onChange={(e) => updateField("email", e.target.value)}
-                    />
+                    <Input label={t("common.name")} placeholder={t("contact.form.namePlaceholder")} required value={form.name} onChange={(e) => updateField("name", e.target.value)} />
+                    <Input label={t("common.email")} type="email" placeholder={t("contact.form.emailPlaceholder")} required value={form.email} onChange={(e) => updateField("email", e.target.value)} />
                   </div>
                 </div>
 
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-5 flex items-start gap-3">
-                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-sm">
-                      <Mail size={18} />
-                    </div>
-
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-sm"><Mail size={18} /></div>
                     <div>
-                      <div className="text-lg font-bold text-slate-900">
-                        Message details
-                      </div>
-                      <div className="text-sm text-slate-500">
-                        Tell us clearly what you need help with
-                      </div>
+                      <div className="text-lg font-bold text-slate-900">{t("contact.form.messageDetails")}</div>
+                      <div className="text-sm text-slate-500">{t("contact.form.messageDetailsSubtitle")}</div>
                     </div>
                   </div>
-
                   <div className="space-y-5">
                     <div className="space-y-2">
-                      <Input
-                        label="Subject"
-                        placeholder="What do you need help with?"
-                        required
-                        value={form.subject}
-                        onChange={(e) => updateField("subject", e.target.value)}
-                      />
-                      <div className="text-right text-xs text-slate-500">
-                        {subjectLength} characters
-                      </div>
+                      <Input label={t("common.subject")} placeholder={t("contact.form.subjectPlaceholder")} required value={form.subject} onChange={(e) => updateField("subject", e.target.value)} />
+                      <div className="text-right text-xs text-slate-500">{subjectLength} {t("contact.form.characters")}</div>
                     </div>
-
                     <label className="block">
-                      <div className="mb-1.5 text-sm font-semibold text-slate-700">
-                        Message
-                      </div>
-                      <textarea
-                        required
-                        rows={7}
-                        value={form.message}
-                        onChange={(e) => updateField("message", e.target.value)}
-                        placeholder="Tell us how we can help you..."
-                        className="w-full resize-none rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                      />
+                      <div className="mb-1.5 text-sm font-semibold text-slate-700">{t("common.message")}</div>
+                      <textarea required rows={7} value={form.message} onChange={(e) => updateField("message", e.target.value)} placeholder={t("contact.form.messagePlaceholder")}
+                        className="w-full resize-none rounded-[1.25rem] border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100" />
                       <div className="mt-2 flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                        <span>Be specific so we can help you faster and better.</span>
-                        <span>
-                          {messageWords} words • {messageLength} characters
-                        </span>
+                        <span>{t("contact.form.beSpecific")}</span>
+                        <span>{t("contact.form.wordsCharacters", { words: messageWords, chars: messageLength })}</span>
                       </div>
                     </label>
                   </div>
                 </div>
 
                 <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                  Replies from admin will appear in your profile page, so you can
-                  track all support communication in one place.
+                  {t("contact.form.repliesNote")}
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-sm text-slate-500">
-                    Clear messages usually get faster and better replies.
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit}
-                    className="inline-flex items-center gap-2"
-                  >
+                  <div className="text-sm text-slate-500">{t("contact.form.clearMessages")}</div>
+                  <Button type="submit" disabled={!canSubmit} className="inline-flex items-center gap-2">
                     <Send size={16} />
-                    {loading ? "Sending..." : "Send Message"}
+                    {loading ? t("contact.form.sending") : t("contact.form.sendMessage")}
                   </Button>
                 </div>
               </form>
@@ -308,44 +149,24 @@ export default function Contact() {
 
         <div className="space-y-6 xl:col-span-4">
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
-            <CardHeader
-              title="How support works"
-              subtitle="Simple and organized communication"
-            />
-
+            <CardHeader title={t("contact.howSupport.title")} subtitle={t("contact.howSupport.subtitle")} />
             <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
               <div className="space-y-4">
-                <StepCard
-                  number="1"
-                  title="Send your message"
-                  text="Write your support request with your subject and details."
-                />
-                <StepCard
-                  number="2"
-                  title="Admin reviews it"
-                  text="Your message is received and checked from the admin panel."
-                />
-                <StepCard
-                  number="3"
-                  title="Reply appears in profile"
-                  text="When admin responds, you’ll see the reply inside your profile page."
-                />
+                <StepCard number="1" title={t("contact.howSupport.step1Title")} text={t("contact.howSupport.step1Text")} />
+                <StepCard number="2" title={t("contact.howSupport.step2Title")} text={t("contact.howSupport.step2Text")} />
+                <StepCard number="3" title={t("contact.howSupport.step3Title")} text={t("contact.howSupport.step3Text")} />
               </div>
             </CardBody>
           </Card>
 
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
-            <CardHeader
-              title="Best message tips"
-              subtitle="Get better support answers"
-            />
-
+            <CardHeader title={t("contact.tips.title")} subtitle={t("contact.tips.subtitle")} />
             <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
               <div className="space-y-3 text-sm text-slate-600">
-                <TipItem text="Use a clear subject line." />
-                <TipItem text="Describe the issue or request in simple steps." />
-                <TipItem text="Mention where the problem happened in the app." />
-                <TipItem text="Include enough detail so support can understand quickly." />
+                <TipItem text={t("contact.tips.tip1")} />
+                <TipItem text={t("contact.tips.tip2")} />
+                <TipItem text={t("contact.tips.tip3")} />
+                <TipItem text={t("contact.tips.tip4")} />
               </div>
             </CardBody>
           </Card>
@@ -358,15 +179,9 @@ export default function Contact() {
 function HeroStat({ icon, title, value, subtitle }) {
   return (
     <div className="rounded-[1.5rem] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">
-        {icon}
-      </div>
-      <div className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-        {title}
-      </div>
-      <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">
-        {value}
-      </div>
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white">{icon}</div>
+      <div className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{title}</div>
+      <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">{value}</div>
       <div className="mt-1 text-sm text-slate-500">{subtitle}</div>
     </div>
   );
@@ -384,10 +199,7 @@ function MiniInfo({ title, text }) {
 function StepCard({ number, title, text }) {
   return (
     <div className="flex gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-sm font-black text-white">
-        {number}
-      </div>
-
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-sm font-black text-white">{number}</div>
       <div>
         <div className="text-sm font-bold text-slate-900">{title}</div>
         <div className="mt-1 text-sm leading-6 text-slate-600">{text}</div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   CalendarDays,
@@ -20,22 +21,10 @@ import {
 
 const BLOCKS = ["morning", "afternoon", "evening"];
 
-const BLOCK_META = {
-  morning: {
-    icon: "☀️",
-    title: "Morning",
-    desc: "Start the day with light, practical activities.",
-  },
-  afternoon: {
-    icon: "🌤️",
-    title: "Afternoon",
-    desc: "Main visits, attractions, and experiences.",
-  },
-  evening: {
-    icon: "🌙",
-    title: "Evening",
-    desc: "Dinner, walks, nightlife, or relaxed plans.",
-  },
+const BLOCK_ICONS = {
+  morning: "☀️",
+  afternoon: "🌤️",
+  evening: "🌙",
 };
 
 const textareaClassName =
@@ -218,12 +207,20 @@ function SideInfo({ title, text }) {
 }
 
 export default function EditTrip() {
+  const { t } = useTranslation();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
   const nav = useNavigate();
   const { id } = useParams();
+
+  const BLOCK_META = {
+    morning: { icon: BLOCK_ICONS.morning, title: t("editTrip.morning"), desc: t("editTrip.morningDesc") },
+    afternoon: { icon: BLOCK_ICONS.afternoon, title: t("editTrip.afternoon"), desc: t("editTrip.afternoonDesc") },
+    evening: { icon: BLOCK_ICONS.evening, title: t("editTrip.evening"), desc: t("editTrip.eveningDesc") },
+  };
 
   const [form, setForm] = useState(null);
   const [initialSnapshot, setInitialSnapshot] = useState("");
@@ -249,7 +246,7 @@ export default function EditTrip() {
         setInitialSnapshot(JSON.stringify(normalized));
       } catch (e) {
         if (!alive) return;
-        setErr(e?.response?.data?.message || "Failed to load trip.");
+        setErr(e?.response?.data?.message || t("editTrip.errors.loadFailed"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -471,12 +468,12 @@ export default function EditTrip() {
     setSuccess("");
 
     if (!form?.destination.trim()) {
-      setErr("Please enter a destination.");
+      setErr(t("editTrip.errors.enterDestination"));
       return;
     }
 
     if (!daysCount) {
-      setErr("Please enter valid dates.");
+      setErr(t("editTrip.errors.enterValidDates"));
       return;
     }
 
@@ -531,13 +528,13 @@ export default function EditTrip() {
 
       setForm(normalizedSavedForm);
       setInitialSnapshot(JSON.stringify(normalizedSavedForm));
-      setSuccess("Trip updated successfully.");
+      setSuccess(t("editTrip.errors.tripUpdated"));
 
       setTimeout(() => {
         nav(`/trip/${id}`);
       }, 700);
     } catch (e2) {
-      setErr(e2?.response?.data?.message || "Failed to update trip.");
+      setErr(e2?.response?.data?.message || t("editTrip.errors.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -571,7 +568,7 @@ export default function EditTrip() {
       <div className="mx-auto max-w-3xl space-y-4">
         <Alert type="error">{err}</Alert>
         <Button onClick={() => nav("/trips")} variant="secondary">
-          Back to My Trips
+          {t("editTrip.backToMyTrips")}
         </Button>
       </div>
     );
@@ -587,36 +584,35 @@ export default function EditTrip() {
         <div className="relative grid gap-6 p-6 lg:grid-cols-12 lg:p-8">
           <div className="lg:col-span-8">
             <Badge className="border-sky-200 bg-sky-50 text-sky-700">
-              Manual Trip Editor
+              {t("editTrip.badge")}
             </Badge>
 
             <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-              {form?.destination || "Edit Trip"}
+              {form?.destination || t("editTrip.editTripTitle")}
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-              Reorder days, move activities between sections, and refine your
-              itinerary in a cleaner and more premium editing experience.
+              {t("editTrip.description")}
             </p>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <HeroStat
                 icon={<CalendarDays size={18} />}
-                title="Days"
+                title={t("editTrip.days")}
                 value={daysCount || safeArray(form?.itinerary?.days).length}
-                subtitle="Organized day by day"
+                subtitle={t("editTrip.daysSubtitle")}
               />
               <HeroStat
                 icon={<MapPinned size={18} />}
-                title="Activities"
+                title={t("editTrip.activities")}
                 value={totalActivities}
-                subtitle="Manage all stops and plans"
+                subtitle={t("editTrip.activitiesSubtitle")}
               />
               <HeroStat
                 icon={<Clock3 size={18} />}
-                title="Estimated"
+                title={t("editTrip.estimated")}
                 value={formatHours(totalEstimatedHours)}
-                subtitle="Total planned time"
+                subtitle={t("editTrip.estimatedSubtitle")}
               />
             </div>
           </div>
@@ -624,21 +620,21 @@ export default function EditTrip() {
           <div className="lg:col-span-4">
             <div className="rounded-[1.75rem] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur">
               <div className="text-sm font-bold text-slate-900">
-                Editing status
+                {t("editTrip.editingStatus")}
               </div>
 
               <div className="mt-4 grid gap-3">
                 <SideInfo
-                  title="Current state"
-                  text={hasUnsavedChanges ? "You have unsaved changes." : "All changes are saved."}
+                  title={t("editTrip.currentState")}
+                  text={hasUnsavedChanges ? t("editTrip.unsavedChanges") : t("editTrip.allChangesSaved")}
                 />
                 <SideInfo
-                  title="Protected content"
-                  text="Recommended places, tips, and events remain preserved while editing."
+                  title={t("editTrip.protectedContent")}
+                  text={t("editTrip.protectedContentText")}
                 />
                 <SideInfo
-                  title="Flexible editing"
-                  text="Move activities up, down, or across morning, afternoon, and evening."
+                  title={t("editTrip.flexibleEditing")}
+                  text={t("editTrip.flexibleEditingText")}
                 />
               </div>
             </div>
@@ -653,23 +649,23 @@ export default function EditTrip() {
         <div className="space-y-6 xl:col-span-4">
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
             <CardHeader
-              title="Actions"
-              subtitle="Save your updates or leave the editor"
+              title={t("editTrip.actionsTitle")}
+              subtitle={t("editTrip.actionsSubtitle")}
             />
             <CardBody className="space-y-4 bg-gradient-to-b from-white to-slate-50/60">
               <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-5">
                   <div className="text-lg font-bold text-slate-900">
-                    Trip actions
+                    {t("editTrip.tripActions")}
                   </div>
                   <div className="text-sm text-slate-500">
-                    Manage your current editing session
+                    {t("editTrip.tripActionsSubtitle")}
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <Button type="button" disabled={saving} className="w-full" onClick={saveTrip}>
-                    {saving ? "Saving changes..." : "Save Changes"}
+                    {saving ? t("editTrip.savingChanges") : t("editTrip.saveChanges")}
                   </Button>
 
                   <Button
@@ -678,7 +674,7 @@ export default function EditTrip() {
                     className="w-full"
                     onClick={() => nav(`/trip/${id}`)}
                   >
-                    Cancel
+                    {t("editTrip.cancel")}
                   </Button>
 
                   <Button
@@ -687,31 +683,30 @@ export default function EditTrip() {
                     className="w-full"
                     onClick={() => nav("/trips")}
                   >
-                    Back to My Trips
+                    {t("editTrip.backToMyTrips")}
                   </Button>
                 </div>
               </div>
 
               <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                Edit titles, dates, durations, notes, food suggestions, and backup
-                plans while keeping the trip structure clean and organized.
+                {t("editTrip.editNote")}
               </div>
             </CardBody>
           </Card>
 
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
             <CardHeader
-              title="Editor summary"
-              subtitle="Quick trip edit overview"
+              title={t("editTrip.editorSummary")}
+              subtitle={t("editTrip.editorSummarySubtitle")}
             />
             <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
               <div className="space-y-4">
-                <MiniInfo label="Days" value={safeArray(form?.itinerary?.days).length} />
-                <MiniInfo label="Activities" value={totalActivities} />
-                <MiniInfo label="Estimated Hours" value={formatHours(totalEstimatedHours)} />
+                <MiniInfo label={t("editTrip.daysLabel")} value={safeArray(form?.itinerary?.days).length} />
+                <MiniInfo label={t("editTrip.activitiesLabel")} value={totalActivities} />
+                <MiniInfo label={t("editTrip.estimatedHours")} value={formatHours(totalEstimatedHours)} />
                 <MiniInfo
-                  label="Status"
-                  value={hasUnsavedChanges ? "Editing..." : "Saved"}
+                  label={t("editTrip.statusLabel")}
+                  value={hasUnsavedChanges ? t("editTrip.editing") : t("editTrip.saved")}
                 />
               </div>
             </CardBody>
@@ -719,17 +714,17 @@ export default function EditTrip() {
 
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
             <CardHeader
-              title="Protected content"
-              subtitle="These parts stay preserved"
+              title={t("editTrip.protectedContentTitle")}
+              subtitle={t("editTrip.protectedContentSubtitle")}
             />
             <CardBody className="bg-gradient-to-b from-white to-slate-50/60">
               <div className="space-y-4">
                 <MiniInfo
-                  label="Recommended Places"
+                  label={t("editTrip.recommendedPlaces")}
                   value={safeArray(form?.itinerary?.recommendedPlaces).length}
                 />
-                <MiniInfo label="Tips" value={safeArray(form?.itinerary?.tips).length} />
-                <MiniInfo label="Events" value={safeArray(form?.events).length} />
+                <MiniInfo label={t("editTrip.tips")} value={safeArray(form?.itinerary?.tips).length} />
+                <MiniInfo label={t("editTrip.eventsLabel")} value={safeArray(form?.events).length} />
               </div>
             </CardBody>
           </Card>
@@ -752,19 +747,19 @@ export default function EditTrip() {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">
-                          Day {day.day}
+                          {t("editTrip.dayLabel", { number: day.day })}
                         </div>
                         <div className="mt-1 text-2xl font-black tracking-tight">
-                          Edit day plan
+                          {t("editTrip.editDayPlan")}
                         </div>
                         <div className="mt-1 text-sm leading-6 text-white/75">
-                          Refine the schedule, reorder activities, and improve the plan details.
+                          {t("editTrip.editDayPlanSubtitle")}
                         </div>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
                         <Badge className="border-white/20 bg-white/10 text-white">
-                          {dayActivities} activities
+                          {t("editTrip.activitiesCount", { count: dayActivities })}
                         </Badge>
                         <Badge className="border-white/20 bg-white/10 text-white">
                           {formatHours(dayHours)}
@@ -780,7 +775,7 @@ export default function EditTrip() {
                         onClick={() => moveDay(dayIndex, "up")}
                         disabled={dayIndex === 0}
                       >
-                        ↑ Move day up
+                        {t("editTrip.moveDayUp")}
                       </Button>
 
                       <Button
@@ -790,7 +785,7 @@ export default function EditTrip() {
                         onClick={() => moveDay(dayIndex, "down")}
                         disabled={dayIndex === form.itinerary.days.length - 1}
                       >
-                        ↓ Move day down
+                        {t("editTrip.moveDayDown")}
                       </Button>
 
                       <Button
@@ -799,7 +794,7 @@ export default function EditTrip() {
                         className="bg-white/5 px-3 py-2 text-xs text-white hover:bg-white/10"
                         onClick={() => removeEmptyActivitiesFromDay(dayIndex)}
                       >
-                        Clean empty activities
+                        {t("editTrip.cleanEmptyActivities")}
                       </Button>
                     </div>
                   </div>
@@ -809,22 +804,22 @@ export default function EditTrip() {
                   <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="mb-5">
                       <div className="text-lg font-bold text-slate-900">
-                        Day details
+                        {t("editTrip.dayDetails")}
                       </div>
                       <div className="text-sm text-slate-500">
-                        Set the day title and calendar date
+                        {t("editTrip.dayDetailsSubtitle")}
                       </div>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <Input
-                        label="Day title"
-                        placeholder="e.g. Historic center and local food"
+                        label={t("editTrip.dayTitle")}
+                        placeholder={t("editTrip.dayTitlePlaceholder")}
                         value={day.title}
                         onChange={(e) => updateDay(dayIndex, "title", e.target.value)}
                       />
                       <Input
-                        label="Day date"
+                        label={t("editTrip.dayDate")}
                         type="date"
                         value={day.date}
                         onChange={(e) => updateDay(dayIndex, "date", e.target.value)}
@@ -859,14 +854,14 @@ export default function EditTrip() {
                             className="px-3 py-2 text-xs"
                             onClick={() => addActivity(dayIndex, block)}
                           >
-                            Add activity
+                            {t("editTrip.addActivity")}
                           </Button>
                         </div>
 
                         <div className="space-y-4">
                           {activities.length === 0 ? (
                             <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                              No activities yet in this block.
+                              {t("editTrip.noActivitiesYet")}
                             </div>
                           ) : (
                             activities.map((activity, activityIndex) => (
@@ -877,7 +872,7 @@ export default function EditTrip() {
                                 <div className="mb-4 flex flex-col gap-3">
                                   <div className="flex items-center justify-between gap-3">
                                     <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                                      Activity {activityIndex + 1}
+                                      {t("editTrip.activityLabel", { number: activityIndex + 1 })}
                                     </div>
 
                                     <Button
@@ -888,7 +883,7 @@ export default function EditTrip() {
                                         removeActivity(dayIndex, block, activityIndex)
                                       }
                                     >
-                                      Remove
+                                      {t("editTrip.remove")}
                                     </Button>
                                   </div>
 
@@ -907,7 +902,7 @@ export default function EditTrip() {
                                       }
                                       disabled={activityIndex === 0}
                                     >
-                                      ↑ Up
+                                      {t("editTrip.up")}
                                     </Button>
 
                                     <Button
@@ -924,7 +919,7 @@ export default function EditTrip() {
                                       }
                                       disabled={activityIndex === activities.length - 1}
                                     >
-                                      ↓ Down
+                                      {t("editTrip.down")}
                                     </Button>
 
                                     <Button
@@ -941,7 +936,7 @@ export default function EditTrip() {
                                       }
                                       disabled={BLOCKS.indexOf(block) === 0}
                                     >
-                                      ← Previous plan
+                                      {t("editTrip.prevPlan")}
                                     </Button>
 
                                     <Button
@@ -958,15 +953,15 @@ export default function EditTrip() {
                                       }
                                       disabled={BLOCKS.indexOf(block) === BLOCKS.length - 1}
                                     >
-                                      Next plan →
+                                      {t("editTrip.nextPlan")}
                                     </Button>
                                   </div>
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                   <Input
-                                    label="Title"
-                                    placeholder="e.g. Visit the Colosseum"
+                                    label={t("editTrip.titleLabel")}
+                                    placeholder={t("editTrip.titlePlaceholder")}
                                     value={activity.title}
                                     onChange={(e) =>
                                       updateActivity(
@@ -979,8 +974,8 @@ export default function EditTrip() {
                                     }
                                   />
                                   <Input
-                                    label="Location"
-                                    placeholder="e.g. Colosseum, Rome, Italy"
+                                    label={t("editTrip.locationLabel")}
+                                    placeholder={t("editTrip.locationPlaceholder")}
                                     value={activity.location}
                                     onChange={(e) =>
                                       updateActivity(
@@ -996,11 +991,11 @@ export default function EditTrip() {
 
                                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                                   <Input
-                                    label="Duration (hours)"
+                                    label={t("editTrip.durationLabel")}
                                     type="number"
                                     min="0"
                                     step="0.5"
-                                    placeholder="e.g. 2"
+                                    placeholder={t("editTrip.durationPlaceholder")}
                                     value={activity.durationHours}
                                     onChange={(e) =>
                                       updateActivity(
@@ -1014,7 +1009,7 @@ export default function EditTrip() {
                                   />
 
                                   <TextareaField
-                                    label="Notes"
+                                    label={t("editTrip.notesLabel")}
                                     value={activity.notes}
                                     onChange={(e) =>
                                       updateActivity(
@@ -1025,7 +1020,7 @@ export default function EditTrip() {
                                         e.target.value
                                       )
                                     }
-                                    placeholder="Extra notes, reminders, or advice..."
+                                    placeholder={t("editTrip.notesPlaceholder")}
                                   />
                                 </div>
                               </div>
@@ -1039,19 +1034,19 @@ export default function EditTrip() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                       <TextareaField
-                        label="Food Suggestion"
+                        label={t("editTrip.foodSuggestion")}
                         value={day.foodSuggestion}
                         onChange={(e) => updateDay(dayIndex, "foodSuggestion", e.target.value)}
-                        placeholder="Recommended meal, restaurant style, or local specialty..."
+                        placeholder={t("editTrip.foodSuggestionPlaceholder")}
                       />
                     </div>
 
                     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                       <TextareaField
-                        label="Backup Plan"
+                        label={t("editTrip.backupPlan")}
                         value={day.backupPlan}
                         onChange={(e) => updateDay(dayIndex, "backupPlan", e.target.value)}
-                        placeholder="Alternative idea in case of weather or time issues..."
+                        placeholder={t("editTrip.backupPlanPlaceholder")}
                       />
                     </div>
                   </div>
@@ -1062,7 +1057,7 @@ export default function EditTrip() {
 
           <div className="flex justify-end">
             <Button type="submit" disabled={saving} className="min-w-40">
-              {saving ? "Saving changes..." : "Save Changes"}
+              {saving ? t("editTrip.savingChanges") : t("editTrip.saveChanges")}
             </Button>
           </div>
         </form>

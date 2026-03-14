@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CalendarDays,
@@ -41,49 +42,14 @@ const interestOptions = [
   "family",
 ];
 
-const eventTypeCards = [
-  {
-    id: "festival",
-    label: "Festivals",
-    icon: <PartyPopper size={18} />,
-    desc: "Seasonal celebrations and city events",
-  },
-  {
-    id: "concert",
-    label: "Concerts",
-    icon: <Music4 size={18} />,
-    desc: "Live music and performances",
-  },
-  {
-    id: "culture",
-    label: "Culture",
-    icon: <Drama size={18} />,
-    desc: "Museums, exhibitions, and local arts",
-  },
-  {
-    id: "nightlife",
-    label: "Nightlife",
-    icon: <MoonStar size={18} />,
-    desc: "Evening energy and late experiences",
-  },
-  {
-    id: "food",
-    label: "Food",
-    icon: <UtensilsCrossed size={18} />,
-    desc: "Markets, tastings, and food events",
-  },
-  {
-    id: "family",
-    label: "Family",
-    icon: <Users size={18} />,
-    desc: "Kid-friendly and group-friendly events",
-  },
-  {
-    id: "sports",
-    label: "Sports",
-    icon: <Trophy size={18} />,
-    desc: "Matches, games, and sports happenings",
-  },
+const eventTypeCardDefs = [
+  { id: "festival", icon: <PartyPopper size={18} /> },
+  { id: "concert", icon: <Music4 size={18} /> },
+  { id: "culture", icon: <Drama size={18} /> },
+  { id: "nightlife", icon: <MoonStar size={18} /> },
+  { id: "food", icon: <UtensilsCrossed size={18} /> },
+  { id: "family", icon: <Users size={18} /> },
+  { id: "sports", icon: <Trophy size={18} /> },
 ];
 
 function toISODateLocal(date) {
@@ -120,34 +86,34 @@ function normalizeSourceTab(tab) {
   return "";
 }
 
-function getTripEnergy(pace, budget) {
+function getTripEnergy(pace, budget, t) {
   if (pace === "packed" && budget === "high") {
-    return "Fast, premium, and full of highlights";
+    return t("createTrip.energy.packedHigh");
   }
-  if (pace === "packed") return "Busy days with maximum exploration";
+  if (pace === "packed") return t("createTrip.energy.packed");
   if (pace === "relaxed" && budget === "high") {
-    return "Comfort-first with a luxury feel";
+    return t("createTrip.energy.relaxedHigh");
   }
-  if (pace === "relaxed") return "Easy rhythm, less rush, more breathing room";
-  return "Balanced flow with smart daily pacing";
+  if (pace === "relaxed") return t("createTrip.energy.relaxed");
+  return t("createTrip.energy.default");
 }
 
 function cx(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
-function getTravelerSummary(travelers) {
+function getTravelerSummary(travelers, t) {
   const adults = Number(travelers.adults || 0);
   const children = Number(travelers.children || 0);
   const infants = Number(travelers.infants || 0);
   const total = adults + children + infants;
 
-  if (!total) return "Not specified";
+  if (!total) return t("createTrip.travelerSummary.notSpecified");
 
   const parts = [];
-  if (adults) parts.push(`${adults} adult${adults > 1 ? "s" : ""}`);
-  if (children) parts.push(`${children} child${children > 1 ? "ren" : ""}`);
-  if (infants) parts.push(`${infants} infant${infants > 1 ? "s" : ""}`);
+  if (adults) parts.push(t(adults === 1 ? "createTrip.travelerSummary.adult_one" : "createTrip.travelerSummary.adult_other", { count: adults }));
+  if (children) parts.push(t(children === 1 ? "createTrip.travelerSummary.child_one" : "createTrip.travelerSummary.child_other", { count: children }));
+  if (infants) parts.push(t(infants === 1 ? "createTrip.travelerSummary.infant_one" : "createTrip.travelerSummary.infant_other", { count: infants }));
 
   return parts.join(", ");
 }
@@ -212,6 +178,14 @@ function normalizePlace(place) {
 }
 
 export default function CreateTrip() {
+  const { t } = useTranslation();
+
+  const eventTypeCards = eventTypeCardDefs.map((item) => ({
+    ...item,
+    label: t(`createTrip.events.types.${item.id}`),
+    desc: t(`createTrip.events.${item.id}Desc`),
+  }));
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -310,7 +284,7 @@ export default function CreateTrip() {
   );
 
   const travelerCount = useMemo(() => getTravelerCount(travelers), [travelers]);
-  const travelerSummary = useMemo(() => getTravelerSummary(travelers), [travelers]);
+  const travelerSummary = useMemo(() => getTravelerSummary(travelers, t), [travelers, t]);
 
   const daysCount = useMemo(() => {
     const s = new Date(`${startDate}T12:00:00`);
@@ -323,16 +297,16 @@ export default function CreateTrip() {
     return Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
   }, [startDate, endDate]);
 
-  const tripEnergy = useMemo(() => getTripEnergy(pace, budget), [pace, budget]);
+  const tripEnergy = useMemo(() => getTripEnergy(pace, budget, t), [pace, budget, t]);
 
   const previewTitle = useMemo(() => {
     if (tripMode === "multi") {
       return multiCityPlaces.length
         ? multiCityPlaces.map((city) => city.placeName).join(" → ")
-        : "Your cities";
+        : t("createTrip.previewTitle.yourCities");
     }
-    return destination || "Your destination";
-  }, [tripMode, multiCityPlaces, destination]);
+    return destination || t("createTrip.previewTitle.yourDestination");
+  }, [tripMode, multiCityPlaces, destination, t]);
 
   const mapQuery = useMemo(() => {
     if (tripMode === "multi") return multiCityPlaces[0]?.placeName || "";
@@ -341,11 +315,11 @@ export default function CreateTrip() {
 
   const formSummary = useMemo(() => {
     if (tripMode === "single" && !destination.trim()) {
-      return "Start by choosing where you want to go.";
+      return t("createTrip.formSummary.chooseDestination");
     }
 
     if (tripMode === "multi" && multiCityPlaces.length === 0) {
-      return "Add the cities you want to visit in order.";
+      return t("createTrip.formSummary.addCities");
     }
 
     const target =
@@ -353,10 +327,13 @@ export default function CreateTrip() {
         ? multiCityPlaces.map((city) => city.placeName).join(" → ")
         : destination.trim();
 
-    let summary = `A ${pace} ${daysCount || ""}-day trip to ${target}`;
-    if (budget) summary += ` with a ${budget} budget`;
-    if (travelerCount) summary += ` for ${travelerSummary.toLowerCase()}`;
-    if (includeEvents) summary += " including local events";
+    const paceName = t(`createTrip.preferences.paceOptions.${pace === "packed" ? "fast" : pace}`);
+    const budgetName = t(`createTrip.preferences.budgetOptions.${budget === "low" ? "budget" : budget === "high" ? "luxury" : "midRange"}`);
+
+    let summary = t("createTrip.formSummary.tripBase", { pace: paceName, days: daysCount || "", target });
+    if (budget) summary += t("createTrip.formSummary.withBudget", { budget: budgetName });
+    if (travelerCount) summary += t("createTrip.formSummary.forTravelers", { summary: travelerSummary });
+    if (includeEvents) summary += t("createTrip.formSummary.includingEvents");
     return summary;
   }, [
     tripMode,
@@ -368,15 +345,14 @@ export default function CreateTrip() {
     travelerCount,
     travelerSummary,
     includeEvents,
+    t,
   ]);
 
   const eventSummary = useMemo(() => {
-    if (!includeEvents) return "Events are off for this trip.";
-    if (!eventTypes.length) {
-      return "AI will look for a balanced mix of relevant local events during your dates.";
-    }
-    return `AI will prioritize ${eventTypes.join(", ")} events during your trip.`;
-  }, [includeEvents, eventTypes]);
+    if (!includeEvents) return t("createTrip.eventSummary.off");
+    if (!eventTypes.length) return t("createTrip.eventSummary.mixed");
+    return t("createTrip.eventSummary.prioritize", { types: eventTypes.join(", ") });
+  }, [includeEvents, eventTypes, t]);
 
   function toggleInterest(x) {
     setInterests((prev) =>
@@ -431,7 +407,7 @@ export default function CreateTrip() {
     const normalized = normalizePlace(multiCitySelectedPlace);
 
     if (!normalized) {
-      setErr("Please choose a city from the suggestions, then click Add city.");
+      setErr(t("createTrip.errors.chooseSuggestion"));
       return;
     }
 
@@ -440,7 +416,7 @@ export default function CreateTrip() {
     );
 
     if (alreadyExists) {
-      setErr("This city is already added.");
+      setErr(t("createTrip.errors.cityAlreadyAdded"));
       return;
     }
 
@@ -501,32 +477,32 @@ export default function CreateTrip() {
     const cities = multiCityPlaces.map((city) => city.placeName);
 
     if (tripMode === "single" && !cleanDestination) {
-      setErr("Please enter a destination.");
+      setErr(t("createTrip.errors.enterDestination"));
       return;
     }
 
     if (tripMode === "single" && !selectedPlace) {
-      setErr("Please choose a destination from the suggestions list.");
+      setErr(t("createTrip.errors.chooseDestinationSuggestion"));
       return;
     }
 
     if (tripMode === "multi" && multiCityPlaces.length < 2) {
-      setErr("Please add at least 2 cities for a multi-city trip.");
+      setErr(t("createTrip.errors.minCities"));
       return;
     }
 
     if (!daysCount) {
-      setErr("Please select valid dates.");
+      setErr(t("createTrip.errors.selectValidDates"));
       return;
     }
 
     if (daysCount > 30) {
-      setErr("Please choose a trip length of 30 days or less.");
+      setErr(t("createTrip.errors.maxDays"));
       return;
     }
 
     if (travelerCount < 1) {
-      setErr("Please choose at least 1 traveler.");
+      setErr(t("createTrip.errors.minTravelers"));
       return;
     }
 
@@ -593,45 +569,43 @@ export default function CreateTrip() {
         <div className="relative grid gap-6 p-6 lg:grid-cols-12 lg:p-8">
           <div className="lg:col-span-8">
             <Badge className="border-sky-200 bg-sky-50 text-sky-700">
-              AI Trip Builder
+              {t("createTrip.badge")}
             </Badge>
 
             <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-              Create your next trip
+              {t("createTrip.title")}
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-              Build your itinerary with destination, dates, travel style,
-              travelers, interests, notes, and local events — then generate and
-              save it directly to your account.
+              {t("createTrip.description")}
             </p>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-4">
               <TopHeroStat
                 icon={<MapPinned size={18} />}
-                label="Trip mode"
-                value={tripMode === "multi" ? "Multi-city" : "One city"}
+                label={t("createTrip.tripType.title")}
+                value={tripMode === "multi" ? t("createTrip.tripType.multiCity") : t("createTrip.tripType.oneWay")}
               />
               <TopHeroStat
                 icon={<CalendarDays size={18} />}
-                label="Duration"
-                value={daysCount ? `${daysCount} days` : "Check dates"}
+                label={t("createTrip.dates.title")}
+                value={daysCount ? `${daysCount} ${t("common.days")}` : t("createTrip.dates.title")}
               />
               <TopHeroStat
                 icon={<Users size={18} />}
-                label="Travelers"
-                value={travelerCount ? `${travelerCount} total` : "Not set"}
+                label={t("createTrip.travelers.title")}
+                value={travelerCount ? `${travelerCount} ${t("createTrip.travelers.total")}` : t("createTrip.travelers.title")}
               />
               <TopHeroStat
                 icon={<Sparkles size={18} />}
-                label="Events"
-                value={includeEvents ? "Enabled" : "Disabled"}
+                label={t("createTrip.events.title")}
+                value={includeEvents ? t("createTrip.generate.button") : t("createTrip.events.title")}
               />
             </div>
 
             <div className="mt-6 rounded-3xl border border-sky-100 bg-white/80 p-4 shadow-sm">
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
-                Trip summary
+                {t("createTrip.generate.summary")}
               </div>
               <div className="mt-2 text-sm leading-6 text-slate-700">
                 {formSummary}
@@ -642,20 +616,20 @@ export default function CreateTrip() {
           <div className="lg:col-span-4">
             <div className="rounded-[1.75rem] border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur">
               <div className="text-sm font-bold text-slate-900">
-                Live planning insights
+                {t("createTrip.generate.readyToGenerate")}
               </div>
               <div className="mt-4 grid gap-3">
                 <MiniInsight
-                  title="Smart pacing"
-                  text="Your itinerary adapts to relaxed, moderate, or packed travel styles."
+                  title={t("createTrip.preferences.pace")}
+                  text={t("createTrip.preferences.subtitle")}
                 />
                 <MiniInsight
-                  title="Traveler aware"
-                  text="Solo, couple, family, and group plans can feel more realistic."
+                  title={t("createTrip.travelers.title")}
+                  text={t("createTrip.travelers.subtitle")}
                 />
                 <MiniInsight
-                  title="Events ready"
-                  text="You can make events optional, broad, or highly specific."
+                  title={t("createTrip.events.title")}
+                  text={t("createTrip.events.subtitle")}
                 />
               </div>
             </div>
@@ -667,11 +641,11 @@ export default function CreateTrip() {
         <div className="space-y-6 xl:col-span-5">
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
             <CardHeader
-              title="Trip details"
-              subtitle="Customize the essentials before generating your itinerary"
+              title={t("createTrip.destination.title")}
+              subtitle={t("createTrip.destination.subtitle")}
               right={
                 <Badge className="border-sky-200 bg-sky-50 text-sky-700">
-                  {daysCount ? `${daysCount} days` : "Check dates"}
+                  {daysCount ? `${daysCount} ${t("common.days")}` : t("createTrip.dates.title")}
                 </Badge>
               }
             />
@@ -679,46 +653,46 @@ export default function CreateTrip() {
             <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               <form onSubmit={generate} className="space-y-6">
                 <SectionBlock
-                  title="Trip mode"
-                  subtitle="Choose whether you want one destination or multiple cities"
+                  title={t("createTrip.tripType.title")}
+                  subtitle={t("createTrip.tripType.label")}
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <ModeCard
                       active={tripMode === "single"}
                       tone="sky"
-                      title="One city"
-                      text="Best for focused trips with one destination"
+                      title={t("createTrip.tripType.oneWay")}
+                      text={t("createTrip.destination.subtitle")}
                       onClick={() => setTripMode("single")}
                     />
                     <ModeCard
                       active={tripMode === "multi"}
                       tone="indigo"
-                      title="Multi city"
-                      text="Best for route-based travel across cities"
+                      title={t("createTrip.tripType.multiCity")}
+                      text={t("createTrip.destination.mapSubtitle")}
                       onClick={() => setTripMode("multi")}
                     />
                   </div>
                 </SectionBlock>
 
                 <SectionBlock
-                  title={tripMode === "single" ? "Destination" : "Cities"}
+                  title={tripMode === "single" ? t("createTrip.destination.title") : t("createTrip.tripType.multiCity")}
                   subtitle={
                     tripMode === "single"
-                      ? "Choose the main place you want to visit"
-                      : "Search and add cities in the exact order you want to visit them"
+                      ? t("createTrip.destination.subtitle")
+                      : t("createTrip.destination.mapSubtitle")
                   }
                   right={
                     tripMode === "multi" ? (
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {multiCityPlaces.length} selected
+                        {multiCityPlaces.length} {t("common.destination")}
                       </span>
                     ) : null
                   }
                 >
                   {tripMode === "single" ? (
                     <CityAutoComplete
-                      label="Destination"
-                      placeholder="Search city, region, or country..."
+                      label={t("createTrip.destination.label")}
+                      placeholder={t("createTrip.destination.placeholder")}
                       value={destination}
                       onChange={(value) => {
                         setDestination(value);
@@ -733,8 +707,8 @@ export default function CreateTrip() {
                     <div className="space-y-4">
                       <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                         <CityAutoComplete
-                          label="Add city"
-                          placeholder="Search and choose a city..."
+                          label={t("createTrip.destination.label")}
+                          placeholder={t("createTrip.destination.placeholder")}
                           value={multiCityInput}
                           onChange={(value) => {
                             setMultiCityInput(value);
@@ -755,7 +729,7 @@ export default function CreateTrip() {
                           onClick={addMultiCity}
                         >
                           <Plus size={16} />
-                          Add city
+                          {t("createTrip.addCity")}
                         </Button>
                       </div>
 
@@ -770,7 +744,7 @@ export default function CreateTrip() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-lg">{city.flag || "🌍"}</span>
                                   <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-sky-700">
-                                    Stop {index + 1}
+                                    {t("createTrip.stop", { n: index + 1 })}
                                   </span>
                                 </div>
 
@@ -799,7 +773,7 @@ export default function CreateTrip() {
                                       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                                   )}
                                 >
-                                  ↑ Up
+                                  ↑ {t("common.previous")}
                                 </button>
 
                                 <button
@@ -813,7 +787,7 @@ export default function CreateTrip() {
                                       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                                   )}
                                 >
-                                  ↓ Down
+                                  ↓ {t("common.next")}
                                 </button>
 
                                 <button
@@ -821,7 +795,7 @@ export default function CreateTrip() {
                                   onClick={() => removeMultiCity(index)}
                                   className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
                                 >
-                                  Remove
+                                  {t("common.delete")}
                                 </button>
                               </div>
                             </div>
@@ -829,25 +803,24 @@ export default function CreateTrip() {
                         </div>
                       ) : (
                         <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
-                          No cities added yet. Search for a city and click
-                          <b> Add city</b>.
+                          {t("createTrip.destination.mapSubtitle")}
                         </div>
                       )}
                     </div>
                   )}
                 </SectionBlock>
 
-                <SectionBlock title="Trip dates" subtitle="Choose your travel period">
+                <SectionBlock title={t("createTrip.dates.title")} subtitle={t("createTrip.dates.subtitle")}>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Input
-                      label="Start date"
+                      label={t("createTrip.dates.startDate")}
                       type="date"
                       value={startDate}
                       min={minStartDate}
                       onChange={(e) => handleStartDateChange(e.target.value)}
                     />
                     <Input
-                      label="End date"
+                      label={t("createTrip.dates.endDate")}
                       type="date"
                       value={endDate}
                       min={minEndDate}
@@ -857,34 +830,34 @@ export default function CreateTrip() {
                 </SectionBlock>
 
                 <SectionBlock
-                  title="Travel style"
-                  subtitle="Set the rhythm and budget for the trip"
+                  title={t("createTrip.preferences.title")}
+                  subtitle={t("createTrip.preferences.subtitle")}
                 >
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <Select
-                      label="Pace"
+                      label={t("createTrip.preferences.pace")}
                       value={pace}
                       onChange={(e) => setPace(e.target.value)}
                     >
-                      <option value="relaxed">relaxed</option>
-                      <option value="moderate">moderate</option>
-                      <option value="packed">packed</option>
+                      <option value="relaxed">{t("createTrip.preferences.paceOptions.relaxed")}</option>
+                      <option value="moderate">{t("createTrip.preferences.paceOptions.moderate")}</option>
+                      <option value="packed">{t("createTrip.preferences.paceOptions.fast")}</option>
                     </Select>
 
                     <Select
-                      label="Budget"
+                      label={t("createTrip.preferences.budget")}
                       value={budget}
                       onChange={(e) => setBudget(e.target.value)}
                     >
-                      <option value="low">low</option>
-                      <option value="mid">mid</option>
-                      <option value="high">high</option>
+                      <option value="low">{t("createTrip.preferences.budgetOptions.budget")}</option>
+                      <option value="mid">{t("createTrip.preferences.budgetOptions.midRange")}</option>
+                      <option value="high">{t("createTrip.preferences.budgetOptions.luxury")}</option>
                     </Select>
                   </div>
 
                   <div className="mt-4 rounded-[1.25rem] border border-sky-100 bg-sky-50/70 px-4 py-3">
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-                      Trip energy
+                      {t("createTrip.generate.summary")}
                     </div>
                     <div className="mt-1 text-sm font-semibold text-slate-800">
                       {tripEnergy}
@@ -893,18 +866,18 @@ export default function CreateTrip() {
                 </SectionBlock>
 
                 <SectionBlock
-                  title="Travelers"
-                  subtitle="Choose who is going so the AI can shape better suggestions"
+                  title={t("createTrip.travelers.title")}
+                  subtitle={t("createTrip.travelers.subtitle")}
                   right={
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {travelerCount} total
+                      {travelerCount} {t("createTrip.travelers.total")}
                     </span>
                   }
                 >
                   <div className="space-y-3">
                     <TravelerRow
-                      title="Adults"
-                      subtitle="Age 13+"
+                      title={t("createTrip.travelers.adults")}
+                      subtitle={t("createTrip.travelers.adultsSubtitle")}
                       value={travelers.adults}
                       onDecrease={() => updateTraveler("adults", -1)}
                       onIncrease={() => updateTraveler("adults", 1)}
@@ -913,8 +886,8 @@ export default function CreateTrip() {
                     />
 
                     <TravelerRow
-                      title="Children"
-                      subtitle="Age 2–12"
+                      title={t("createTrip.travelers.children")}
+                      subtitle={t("createTrip.travelers.childrenSubtitle")}
                       value={travelers.children}
                       onDecrease={() => updateTraveler("children", -1)}
                       onIncrease={() => updateTraveler("children", 1)}
@@ -923,8 +896,8 @@ export default function CreateTrip() {
                     />
 
                     <TravelerRow
-                      title="Infants"
-                      subtitle="Under 2"
+                      title={t("createTrip.travelers.infants")}
+                      subtitle={t("createTrip.travelers.infantsSubtitle")}
                       value={travelers.infants}
                       onDecrease={() => updateTraveler("infants", -1)}
                       onIncrease={() => updateTraveler("infants", 1)}
@@ -935,7 +908,7 @@ export default function CreateTrip() {
 
                   <div className="mt-4 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3">
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Traveler summary
+                      {t("createTrip.travelers.total")}
                     </div>
                     <div className="mt-1 text-sm font-semibold text-slate-800">
                       {travelerSummary}
@@ -944,11 +917,11 @@ export default function CreateTrip() {
                 </SectionBlock>
 
                 <SectionBlock
-                  title="Interests"
-                  subtitle="Help the AI shape your itinerary around what matters most"
+                  title={t("createTrip.interests.title")}
+                  subtitle={t("createTrip.interests.subtitle")}
                   right={
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {interests.length} selected
+                      {interests.length} {t("common.interests")}
                     </span>
                   }
                 >
@@ -968,7 +941,7 @@ export default function CreateTrip() {
                               : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
                           )}
                         >
-                          {x}
+                          {t(`createTrip.interests.${x}`)}
                         </button>
                       );
                     })}
@@ -976,8 +949,8 @@ export default function CreateTrip() {
                 </SectionBlock>
 
                 <SectionBlock
-                  title="Events during your trip"
-                  subtitle="Make events optional, then choose the kinds of experiences you want the AI to look for"
+                  title={t("createTrip.events.title")}
+                  subtitle={t("createTrip.events.subtitle")}
                   tone="indigo"
                   right={
                     <Badge
@@ -987,7 +960,7 @@ export default function CreateTrip() {
                           : "border-slate-200 bg-slate-100 text-slate-600"
                       }
                     >
-                      {includeEvents ? "Optional feature on" : "Optional feature off"}
+                      {includeEvents ? t("createTrip.events.title") : t("createTrip.events.subtitle")}
                     </Badge>
                   }
                 >
@@ -1015,11 +988,10 @@ export default function CreateTrip() {
 
                           <div>
                             <div className="text-sm font-bold text-slate-900">
-                              Include local events
+                              {t("createTrip.events.title")}
                             </div>
                             <div className="mt-1 text-sm leading-6 text-slate-600">
-                              Add concerts, festivals, food events, nightlife, and
-                              more that match your dates and destination.
+                              {t("createTrip.events.subtitle")}
                             </div>
                           </div>
                         </div>
@@ -1034,7 +1006,7 @@ export default function CreateTrip() {
                               : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
                           )}
                         >
-                          {includeEvents ? "Enabled" : "Enable events"}
+                          {includeEvents ? t("createTrip.events.title") : t("createTrip.events.subtitle")}
                         </button>
                       </div>
 
@@ -1048,16 +1020,15 @@ export default function CreateTrip() {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-sm font-bold text-slate-900">
-                              Event preferences
+                              {t("createTrip.events.title")}
                             </div>
                             <div className="text-xs text-slate-500">
-                              Leave all unselected for a broad mix, or pick specific
-                              event styles.
+                              {t("createTrip.events.subtitle")}
                             </div>
                           </div>
 
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                            {eventTypes.length || "All"} selected
+                            {eventTypes.length || t("common.filter")} {t("common.interests")}
                           </span>
                         </div>
 
@@ -1103,7 +1074,7 @@ export default function CreateTrip() {
                                       </div>
                                       {active ? (
                                         <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                                          Selected
+                                          {t("common.filter")}
                                         </span>
                                       ) : null}
                                     </div>
@@ -1120,16 +1091,15 @@ export default function CreateTrip() {
                       </>
                     ) : (
                       <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
-                        Events are optional. Turn this on any time if you want your
-                        itinerary to include local happenings during your trip.
+                        {t("createTrip.events.subtitle")}
                       </div>
                     )}
                   </div>
                 </SectionBlock>
 
                 <SectionBlock
-                  title="Notes"
-                  subtitle="Optional preferences for food, walking, family style, timing, and more"
+                  title={t("createTrip.generate.summary")}
+                  subtitle={t("createTrip.generate.readyToGenerate")}
                   right={
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                       {notes.length}/300
@@ -1141,7 +1111,7 @@ export default function CreateTrip() {
                       value={notes}
                       maxLength={300}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="e.g., we like walking, cafes, local food, not too early, family-friendly..."
+                      placeholder={t("createTrip.destination.placeholder")}
                       className="min-h-36 w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:ring-4 focus:ring-sky-100"
                     />
                   </label>
@@ -1150,8 +1120,7 @@ export default function CreateTrip() {
                 {err ? <Alert type="error">{err}</Alert> : null}
 
                 <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  When you click <b>Generate &amp; Save</b>, your AI itinerary is
-                  created and saved directly to your account.
+                  {t("createTrip.generate.readyToGenerate")}
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -1161,7 +1130,7 @@ export default function CreateTrip() {
                     className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
                   >
                     <Wand2 size={16} />
-                    {loading ? "Generating..." : "Generate & Save"}
+                    {loading ? t("createTrip.generate.generating") : t("createTrip.generate.button")}
                   </Button>
 
                   <Button
@@ -1170,7 +1139,7 @@ export default function CreateTrip() {
                     className="w-full sm:w-auto"
                     onClick={() => nav("/trips")}
                   >
-                    View My Trips
+                    {t("nav.myTrips")}
                   </Button>
 
                   <Button
@@ -1180,7 +1149,7 @@ export default function CreateTrip() {
                     onClick={resetForm}
                   >
                     <RefreshCw size={16} />
-                    Reset Form
+                    {t("common.reset")}
                   </Button>
                 </div>
               </form>
@@ -1198,7 +1167,7 @@ export default function CreateTrip() {
 
               <div className="relative">
                 <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">
-                  Live Preview
+                  {t("createTrip.generate.summary")}
                 </div>
 
                 <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1213,29 +1182,29 @@ export default function CreateTrip() {
 
                   <div className="flex flex-wrap gap-2">
                     <GlassPill>
-                      {daysCount ? `${daysCount} days` : "Invalid dates"}
+                      {daysCount ? `${daysCount} ${t("common.days")}` : t("common.datesNotSet")}
                     </GlassPill>
                     {tripMode === "multi" && multiCityPlaces.length ? (
-                      <GlassPill>{multiCityPlaces.length} cities</GlassPill>
+                      <GlassPill>{multiCityPlaces.length} {t("createTrip.tripType.multiCity")}</GlassPill>
                     ) : null}
                     {travelerCount ? <GlassPill>{travelerSummary}</GlassPill> : null}
-                    {includeEvents ? <GlassPill>local events</GlassPill> : null}
+                    {includeEvents ? <GlassPill>{t("createTrip.events.title")}</GlassPill> : null}
                   </div>
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {(interests.length ? interests : ["custom trip"])
+                  {(interests.length ? interests : [null])
                     .slice(0, 6)
                     .map((x) => (
-                      <GlassPill key={x} className="capitalize">
-                        {x}
+                      <GlassPill key={x ?? "custom"} className="capitalize">
+                        {x ? t(`createTrip.interests.${x}`) : t("createTrip.customTrip")}
                       </GlassPill>
                     ))}
 
                   {includeEvents &&
                     eventTypes.slice(0, 4).map((x) => (
                       <GlassPill key={`event-${x}`} className="capitalize">
-                        {x}
+                        {t(`createTrip.events.types.${x}`)}
                       </GlassPill>
                     ))}
                 </div>
@@ -1245,49 +1214,49 @@ export default function CreateTrip() {
             <CardBody className="space-y-6 bg-gradient-to-b from-white to-slate-50/60">
               <div className="grid gap-4 sm:grid-cols-2">
                 <PreviewCard
-                  title="Day structure"
-                  text="Morning / Afternoon / Evening planning blocks"
+                  title={t("createTrip.dates.title")}
+                  text={t("createTrip.dates.subtitle")}
                 />
                 <PreviewCard
-                  title="Smart pacing"
-                  text="Trip flow adjusts to your selected pace and budget"
+                  title={t("createTrip.preferences.pace")}
+                  text={t("createTrip.preferences.subtitle")}
                 />
                 <PreviewCard
-                  title="Traveler-aware"
-                  text="Suggestions can better fit solo travel, couples, families, and groups"
+                  title={t("createTrip.travelers.title")}
+                  text={t("createTrip.travelers.subtitle")}
                 />
                 <PreviewCard
-                  title="Saved securely"
-                  text="Your itinerary is stored in your account for later use"
+                  title={t("createTrip.generate.readyToGenerate")}
+                  text={t("createTrip.generate.summary")}
                 />
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
                 <MiniInfo
-                  label={tripMode === "multi" ? "Trip mode" : "Destination"}
+                  label={tripMode === "multi" ? t("createTrip.tripType.title") : t("createTrip.destination.title")}
                   value={
                     tripMode === "multi"
-                      ? "Multi-city"
-                      : destination || "Not selected yet"
+                      ? t("createTrip.tripType.multiCity")
+                      : destination || t("createTrip.destination.placeholder")
                   }
                 />
-                <MiniInfo label="Pace" value={pace} />
-                <MiniInfo label="Budget" value={budget} />
+                <MiniInfo label={t("createTrip.preferences.pace")} value={t(`createTrip.preferences.paceOptions.${pace === "packed" ? "fast" : pace}`)} />
+                <MiniInfo label={t("createTrip.preferences.budget")} value={t(`createTrip.preferences.budgetOptions.${budget === "low" ? "budget" : budget === "high" ? "luxury" : "midRange"}`)} />
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <MiniInfo label="Travelers" value={travelerSummary} />
-                <MiniInfo label="Trip energy" value={tripEnergy} />
+                <MiniInfo label={t("createTrip.travelers.total")} value={travelerSummary} />
+                <MiniInfo label={t("createTrip.generate.summary")} value={tripEnergy} />
               </div>
 
               {tripMode === "multi" && multiCityPlaces.length ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="text-sm font-bold text-slate-900">
-                      Cities in this trip
+                      {t("createTrip.tripType.multiCity")}
                     </div>
                     <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {multiCityPlaces.length} cities
+                      {multiCityPlaces.length} {t("createTrip.tripType.multiCity")}
                     </div>
                   </div>
 
@@ -1306,61 +1275,59 @@ export default function CreateTrip() {
 
               {(sourceTab || travelerCount || tripType) && (
                 <div className="grid gap-3 md:grid-cols-3">
-                  {sourceTab ? <MiniInfo label="Source" value={sourceTab} /> : null}
+                  {sourceTab ? <MiniInfo label={t("createTrip.destination.label")} value={sourceTab} /> : null}
                   {travelerCount ? (
-                    <MiniInfo label="Total people" value={`${travelerCount}`} />
+                    <MiniInfo label={t("createTrip.travelers.total")} value={`${travelerCount}`} />
                   ) : null}
-                  {tripType ? <MiniInfo label="Trip type" value={tripType} /> : null}
+                  {tripType ? <MiniInfo label={t("createTrip.tripType.title")} value={tripType} /> : null}
                 </div>
               )}
 
               {includeEvents ? (
                 <div className="rounded-3xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-sky-50 p-4 text-sm text-slate-600">
                   <div className="mb-1 font-bold text-slate-900">
-                    Events enabled
+                    {t("createTrip.events.title")}
                   </div>
                   {eventSummary}
                 </div>
               ) : (
                 <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
                   <div className="mb-1 font-bold text-slate-900">
-                    Events optional
+                    {t("createTrip.events.subtitle")}
                   </div>
-                  You can keep events off for a cleaner classic itinerary, or turn
-                  them on for local happenings during your dates.
+                  {t("createTrip.events.subtitle")}
                 </div>
               )}
 
               {notes.trim() ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
-                  <div className="mb-2 font-bold text-slate-900">Trip notes</div>
+                  <div className="mb-2 font-bold text-slate-900">{t("createTrip.generate.summary")}</div>
                   {notes.trim()}
                 </div>
               ) : null}
 
               <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Preview your trip settings here before generating the final
-                itinerary.
+                {t("createTrip.generate.readyToGenerate")}
               </div>
             </CardBody>
           </Card>
 
           <Card className="overflow-hidden border border-slate-200/80 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.16)]">
             <CardHeader
-              title="Destination map"
+              title={t("createTrip.destination.mapTitle")}
               subtitle={
                 mapQuery
-                  ? `Live location preview for ${mapQuery}`
-                  : "Enter a destination to preview it on the map"
+                  ? `${t("createTrip.destination.mapSubtitle")} ${mapQuery}`
+                  : t("createTrip.destination.subtitle")
               }
               right={
                 mapQuery ? (
                   <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-                    Preview ready
+                    {t("createTrip.generate.readyToGenerate")}
                   </Badge>
                 ) : (
                   <Badge className="border-slate-200 bg-slate-100 text-slate-600">
-                    Waiting
+                    {t("createTrip.destination.subtitle")}
                   </Badge>
                 )
               }
@@ -1373,8 +1340,8 @@ export default function CreateTrip() {
 
               <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
                 {tripMode === "multi"
-                  ? "For multi-city trips, the map previews your first city before generation."
-                  : "Use the live map to confirm your destination before generating the full itinerary."}
+                  ? t("createTrip.destination.mapSubtitle")
+                  : t("createTrip.destination.mapTitle")}
               </div>
             </CardBody>
           </Card>

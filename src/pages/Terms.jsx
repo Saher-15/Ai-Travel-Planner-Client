@@ -1,116 +1,60 @@
 import { Link } from "react-router-dom";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+
 function Section({ title, children }) {
-    return (
-        <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-black tracking-tight text-slate-900">{title}</h2>
-            <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">{children}</div>
-        </section>
-    );
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm sm:p-6">
+      <h2 className="text-lg font-black tracking-tight text-slate-900">{title}</h2>
+      <div className="mt-3 space-y-3 text-sm leading-7 text-slate-600">{children}</div>
+    </section>
+  );
 }
 
 export default function Terms() {
-    useEffect(() => {
-        window.scrollTo(0, 0);
-    }, []);
-    return (
-        <section className="mx-auto max-w-5xl">
-            <div className="rounded-[2rem] border border-sky-100 bg-white/90 p-6 shadow-[0_20px_60px_-30px_rgba(2,132,199,0.35)] sm:p-8">
-                <div className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-sky-700">
-                    Legal
-                </div>
+  const { t } = useTranslation();
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
-                <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-                    Terms of Service
-                </h1>
+  const s = (key) => t(`terms.sections.${key}`, { returnObjects: true });
 
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                    These Terms of Service govern your use of Travel Planner. By accessing or
-                    using the platform, you agree to these terms.
-                </p>
+  return (
+    <section className="mx-auto max-w-5xl">
+      <div className="rounded-[2rem] border border-sky-100 bg-white/90 p-6 shadow-[0_20px_60px_-30px_rgba(2,132,199,0.35)] sm:p-8">
+        <div className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-sky-700">
+          {t("terms.badge")}
+        </div>
 
-                <div className="mt-8 grid gap-4">
-                    <Section title="1. Use of the Service">
-                        <p>
-                            Travel Planner is provided to help users generate and organize travel
-                            plans. You agree to use the platform only for lawful and appropriate
-                            purposes.
-                        </p>
-                    </Section>
+        <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">{t("terms.title")}</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{t("terms.description")}</p>
 
-                    <Section title="2. Account Responsibility">
-                        <p>
-                            If you create an account, you are responsible for maintaining the
-                            confidentiality of your login credentials and for all activity under
-                            your account.
-                        </p>
-                    </Section>
+        <div className="mt-8 grid gap-4">
+          <Section title={s("1").title}><p>{s("1").p1}</p></Section>
+          <Section title={s("2").title}><p>{s("2").p1}</p></Section>
+          <Section title={s("3").title}><p>{s("3").p1}</p></Section>
+          <Section title={s("4").title}><p>{s("4").p1}</p></Section>
+          <Section title={s("5").title}><p>{s("5").p1}</p></Section>
 
-                    <Section title="3. User Content">
-                        <p>
-                            You may provide information such as destinations, travel preferences,
-                            and trip details. You are responsible for ensuring that the information
-                            you submit is accurate and appropriate.
-                        </p>
-                    </Section>
+          <Section title={s("6").title}>
+            <p>{s("6").intro}</p>
+            <ul className="list-disc space-y-2 pl-5">
+              {s("6").items.map((item, i) => <li key={i}>{item}</li>)}
+            </ul>
+          </Section>
 
-                    <Section title="4. Service Availability">
-                        <p>
-                            We aim to provide a reliable experience, but we do not guarantee that
-                            the platform will always be available, uninterrupted, or error-free.
-                        </p>
-                    </Section>
+          <Section title={s("7").title}><p>{s("7").p1}</p></Section>
+          <Section title={s("8").title}><p>{s("8").p1}</p></Section>
+        </div>
 
-                    <Section title="5. Generated Content">
-                        <p>
-                            Travel itineraries and recommendations generated by the platform are
-                            for informational and planning purposes only. Users should independently
-                            verify travel details, bookings, schedules, prices, weather, and local
-                            requirements before making decisions.
-                        </p>
-                    </Section>
-
-                    <Section title="6. Prohibited Use">
-                        <p>You agree not to misuse the platform, including but not limited to:</p>
-                        <ul className="list-disc space-y-2 pl-5">
-                            <li>Attempting unauthorized access to accounts or systems</li>
-                            <li>Using the platform for illegal, harmful, or abusive activity</li>
-                            <li>Disrupting service performance or platform security</li>
-                            <li>Uploading misleading, harmful, or inappropriate content</li>
-                        </ul>
-                    </Section>
-
-                    <Section title="7. Limitation of Liability">
-                        <p>
-                            Travel Planner is provided on an “as is” basis. To the extent allowed
-                            by law, we are not liable for losses, damages, or decisions made based
-                            on the use of generated travel content or platform features.
-                        </p>
-                    </Section>
-
-                    <Section title="8. Changes to the Terms">
-                        <p>
-                            We may update these Terms of Service from time to time. Continued use
-                            of the platform after changes means you accept the updated terms.
-                        </p>
-                    </Section>
-                </div>
-
-                <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
-                    <div className="text-sm font-bold text-slate-900">Need clarification?</div>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                        If you have any questions about these terms, please contact us.
-                    </p>
-                    <div className="mt-4">
-                        <Link
-                            to="/contact"
-                            className="inline-flex items-center justify-center rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500"
-                        >
-                            Contact Us
-                        </Link>
-                    </div>
-                </div>
-            </div>
-        </section>
-    );
+        <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+          <div className="text-sm font-bold text-slate-900">{t("terms.needClarification")}</div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{t("terms.needClarificationText")}</p>
+          <div className="mt-4">
+            <Link to="/contact" className="inline-flex items-center justify-center rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500">
+              {t("terms.contactUs")}
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }

@@ -7,11 +7,11 @@ import {
   Globe2,
   MapPinned,
   PlaneTakeoff,
-  Search,
   Sparkles,
   Wand2,
 } from "lucide-react";
 import { Button, Card, CardBody, Badge } from "../components/UI.jsx";
+import { useTranslation } from "react-i18next";
 
 const cx = (...c) => c.filter(Boolean).join(" ");
 
@@ -25,137 +25,9 @@ const STOCK = {
     "https://images.unsplash.com/photo-1526772662000-3f88f10405ff?auto=format&fit=crop&w=1600&q=80",
 };
 
-const features = [
-  {
-    title: "AI day-by-day itinerary",
-    text: "Generate practical travel plans with structured morning, afternoon, and evening activities.",
-    icon: <Wand2 size={20} />,
-  },
-  {
-    title: "Smart travel pacing",
-    text: "Build trips that match different travel rhythms like relaxed, balanced, or packed adventures.",
-    icon: <Compass size={20} />,
-  },
-  {
-    title: "Save your journeys",
-    text: "Keep all your travel plans in one place and revisit them anytime from your trip library.",
-    icon: <FolderKanban size={20} />,
-  },
-  {
-    title: "Visual planning experience",
-    text: "Enjoy a premium planner interface that feels modern, clean, and inspiring.",
-    icon: <MapPinned size={20} />,
-  },
-];
-
-const highlights = [
-  "AI itinerary generation",
-  "Portfolio-ready planner UI",
-  "Destination-focused experience",
-];
-
-const stats = [
-  {
-    label: "Generation speed",
-    value: "Fast",
-    sub: "quick itinerary creation flow",
-    icon: <Sparkles size={18} />,
-  },
-  {
-    label: "Daily structure",
-    value: "3 blocks",
-    sub: "morning / afternoon / evening",
-    icon: <Globe2 size={18} />,
-  },
-  {
-    label: "Trip management",
-    value: "Easy",
-    sub: "save and revisit your plans",
-    icon: <FolderKanban size={18} />,
-  },
-  {
-    label: "Experience",
-    value: "Premium",
-    sub: "modern clean planner design",
-    icon: <PlaneTakeoff size={18} />,
-  },
-];
-
-const steps = [
-  {
-    title: "Choose your destination",
-    text: "Start with the place you want to visit and define your travel dates.",
-    number: "01",
-  },
-  {
-    title: "Set your travel style",
-    text: "Decide how you want your journey to feel before generating the itinerary.",
-    number: "02",
-  },
-  {
-    title: "Generate the trip plan",
-    text: "Let the planner create a structured and inspiring trip for your journey.",
-    number: "03",
-  },
-];
-
-const POPULAR_DESTINATIONS = [
-  {
-    name: "Paris, France",
-    tag: "Romantic city energy",
-    image:
-      "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1200&q=80",
-    badge: "Inspiration",
-  },
-  {
-    name: "Tokyo, Japan",
-    tag: "Modern culture & food",
-    image:
-      "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=1200&q=80",
-    badge: "Popular",
-  },
-  {
-    name: "Bali, Indonesia",
-    tag: "Nature & calm escape",
-    image:
-      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
-    badge: "Relaxed",
-  },
-  {
-    name: "New York, USA",
-    tag: "Urban discovery",
-    image:
-      "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80",
-    badge: "City trip",
-  },
-];
-
-const plannerBenefits = [
-  "Cleaner project identity",
-  "More relevant user experience",
-  "Stronger AI travel planner branding",
-  "Better portfolio and recruiter impression",
-];
-
-const travelModes = [
-  {
-    title: "Relaxed planner",
-    text: "For travelers who want slower days, fewer stops, and more breathing space.",
-    icon: "🌿",
-  },
-  {
-    title: "Balanced explorer",
-    text: "For travelers who want a healthy mix of attractions, food, and free time.",
-    icon: "🧭",
-  },
-  {
-    title: "Packed adventure",
-    text: "For travelers who want to maximize the day and explore more locations.",
-    icon: "🔥",
-  },
-];
-
 export default function Home() {
+  const { t } = useTranslation();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -165,14 +37,34 @@ export default function Home() {
 
   const goToCreate = (payload = {}) => {
     const params = new URLSearchParams();
-
     if (payload.destination) params.set("destination", payload.destination);
     if (payload.travelers) params.set("travelers", payload.travelers);
     if (payload.tripType) params.set("tripType", payload.tripType);
-
     const query = params.toString();
     nav(query ? `/create?${query}` : "/create");
   };
+
+  const features = [
+    { title: t("home.features.list.0.title"), text: t("home.features.list.0.text"), icon: <Wand2 size={20} /> },
+    { title: t("home.features.list.1.title"), text: t("home.features.list.1.text"), icon: <Compass size={20} /> },
+    { title: t("home.features.list.2.title"), text: t("home.features.list.2.text"), icon: <FolderKanban size={20} /> },
+    { title: t("home.features.list.3.title"), text: t("home.features.list.3.text"), icon: <MapPinned size={20} /> },
+  ];
+
+  const highlights = t("home.highlights", { returnObjects: true });
+
+  const stats = [
+    { label: t("home.stats.generationSpeed"), value: t("home.stats.fast"), sub: t("home.stats.quickItinerary"), icon: <Sparkles size={18} /> },
+    { label: t("home.stats.dailyStructure"), value: t("home.stats.threeBlocks"), sub: t("home.stats.morningAfternoonEvening"), icon: <Globe2 size={18} /> },
+    { label: t("home.stats.tripManagement"), value: t("home.stats.easy"), sub: t("home.stats.saveRevisit"), icon: <FolderKanban size={18} /> },
+    { label: t("home.stats.experience"), value: t("home.stats.premium"), sub: t("home.stats.modernDesign"), icon: <PlaneTakeoff size={18} /> },
+  ];
+
+  const steps = t("home.howItWorks.steps", { returnObjects: true });
+  const travelModes = t("home.planningStyles.modes", { returnObjects: true });
+  const destinations = t("home.destinations.list", { returnObjects: true });
+  const plannerBenefits = t("home.focusedIdentity.benefits", { returnObjects: true });
+  const featureBadges = t("home.featureBadges", { returnObjects: true });
 
   return (
     <div className="space-y-20">
@@ -189,21 +81,19 @@ export default function Home() {
           <div className="lg:col-span-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-white/90 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_14px_rgba(16,185,129,0.9)]" />
-              AI-powered travel planner
+              {t("home.badge")}
             </div>
 
             <div className="mt-6 max-w-3xl">
               <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl lg:text-6xl xl:text-7xl">
-                Turn ideas into
+                {t("home.hero.title1")}
                 <span className="mt-2 block bg-gradient-to-r from-sky-700 via-blue-600 to-indigo-500 bg-clip-text text-transparent">
-                  extraordinary travel plans.
+                  {t("home.hero.title2")}
                 </span>
               </h1>
 
               <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-                Build beautiful AI-generated itineraries without booking clutter.
-                Focus on destination inspiration, smart daily planning, and a premium
-                experience from the first click.
+                {t("home.hero.description")}
               </p>
             </div>
 
@@ -225,7 +115,7 @@ export default function Home() {
                 onClick={() => nav("/create")}
               >
                 <PlaneTakeoff size={16} />
-                Start Planning
+                {t("home.hero.startPlanning")}
               </Button>
 
               <Button
@@ -234,7 +124,7 @@ export default function Home() {
                 onClick={() => nav("/trips")}
               >
                 <FolderKanban size={16} />
-                Explore My Trips
+                {t("home.hero.exploreTrips")}
               </Button>
             </div>
 
@@ -267,22 +157,23 @@ export default function Home() {
                 <PhotoCard
                   src={a}
                   className="min-h-60 sm:row-span-2 sm:min-h-full"
-                  badge="Top destinations"
+                  badge={t("home.photoCards.topDestinations")}
+                  caption={t("home.photoCards.inspiredPlanning")}
                 />
-                <PhotoCard src={b} className="min-h-[10.625rem]" badge="Culture & food" />
-                <PhotoCard src={c} className="min-h-[10.625rem]" badge="Nature & escape" />
+                <PhotoCard src={b} className="min-h-[10.625rem]" badge={t("home.photoCards.cultureFood")} caption={t("home.photoCards.inspiredPlanning")} />
+                <PhotoCard src={c} className="min-h-[10.625rem]" badge={t("home.photoCards.natureEscape")} caption={t("home.photoCards.inspiredPlanning")} />
               </div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <InfoCard
-                  title="Focused planning"
-                  subtitle="No bookings. Just destination-first trip creation."
-                  badge="Clear identity"
+                  title={t("home.infoCard.focusedPlanning")}
+                  subtitle={t("home.infoCard.noBookings")}
+                  badge={t("home.infoCard.clearIdentity")}
                 />
                 <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-600 to-blue-700 p-4 text-white shadow-lg">
-                  <div className="text-sm font-bold">Premium planner feel</div>
+                  <div className="text-sm font-bold">{t("home.infoCard.premiumPlanner")}</div>
                   <div className="mt-1 text-xs text-white/80">
-                    Strong visuals, smart sections, and a cleaner project story.
+                    {t("home.infoCard.strongVisuals")}
                   </div>
                 </div>
               </div>
@@ -293,12 +184,7 @@ export default function Home() {
 
       <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white px-6 py-5 shadow-sm sm:px-8">
         <div className="flex flex-wrap items-center justify-center gap-3">
-          {[
-            "AI itinerary builder",
-            "Smart daily trip flow",
-            "Visual travel inspiration",
-            "Saved trips experience",
-          ].map((item) => (
+          {featureBadges.map((item) => (
             <span
               key={item}
               className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm"
@@ -312,14 +198,13 @@ export default function Home() {
       <section className="space-y-6">
         <div className="max-w-2xl">
           <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-            How it works
+            {t("home.howItWorks.badge")}
           </div>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-            A simple journey from inspiration to itinerary
+            {t("home.howItWorks.title")}
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
-            Your homepage should guide visitors naturally into creating a trip, not
-            feel like a reservation marketplace.
+            {t("home.howItWorks.description")}
           </p>
         </div>
 
@@ -351,13 +236,13 @@ export default function Home() {
       <section className="space-y-6">
         <div className="max-w-2xl">
           <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-            Planning styles
+            {t("home.planningStyles.badge")}
           </div>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-            Choose how the trip should feel
+            {t("home.planningStyles.title")}
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
-            These blocks make the planner feel smarter and more personalized.
+            {t("home.planningStyles.description")}
           </p>
         </div>
 
@@ -383,13 +268,13 @@ export default function Home() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="max-w-2xl">
             <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-              Destination inspiration
+              {t("home.destinations.badge")}
             </div>
             <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-              Pick a place and jump directly into planning
+              {t("home.destinations.title")}
             </h2>
             <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
-              Each card acts as an inspiration-first shortcut to your Create Trip page.
+              {t("home.destinations.description")}
             </p>
           </div>
 
@@ -399,19 +284,19 @@ export default function Home() {
             onClick={() => nav("/create")}
           >
             <ArrowRight size={16} />
-            Start a blank trip
+            {t("home.destinations.startBlankTrip")}
           </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {POPULAR_DESTINATIONS.map((d) => (
+          {destinations.map((d) => (
             <Card
               key={d.name}
               className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-28px_rgba(15,23,42,0.3)]"
             >
               <div className="relative h-52 overflow-hidden">
                 <img
-                  src={d.image}
+                  src={STOCK.hero[destinations.indexOf(d) % STOCK.hero.length] || STOCK.visual}
                   alt={d.name}
                   className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                   loading="lazy"
@@ -431,7 +316,7 @@ export default function Home() {
               <CardBody className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-slate-500">
-                    Inspiration ready
+                    {t("home.destinations.inspirationReady")}
                   </span>
                   <Badge>{d.badge}</Badge>
                 </div>
@@ -447,7 +332,7 @@ export default function Home() {
                   }
                 >
                   <MapPinned size={16} />
-                  Plan this destination
+                  {t("home.destinations.planDestination")}
                 </Button>
               </CardBody>
             </Card>
@@ -458,13 +343,13 @@ export default function Home() {
       <section className="space-y-6">
         <div className="max-w-2xl">
           <div className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-            Powerful features
+            {t("home.features.badge")}
           </div>
           <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
-            Everything your planner needs
+            {t("home.features.title")}
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-600 sm:text-base">
-            Focused features make your product feel more complete and more believable.
+            {t("home.features.description")}
           </p>
         </div>
 
@@ -495,16 +380,15 @@ export default function Home() {
             <CardBody className="flex h-full flex-col justify-between space-y-6">
               <div>
                 <div className="inline-flex rounded-full border border-slate-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                  Focused product identity
+                  {t("home.focusedIdentity.badge")}
                 </div>
 
                 <h3 className="mt-4 text-2xl font-black tracking-tight text-slate-900">
-                  A homepage that truly matches your planner
+                  {t("home.focusedIdentity.title")}
                 </h3>
 
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  Removing irrelevant booking sections makes your app cleaner,
-                  smarter, and much more convincing as a real AI travel planner.
+                  {t("home.focusedIdentity.description")}
                 </p>
               </div>
 
@@ -527,7 +411,7 @@ export default function Home() {
                   onClick={() => nav("/create")}
                 >
                   <PlaneTakeoff size={16} />
-                  Build My Trip
+                  {t("home.focusedIdentity.buildTrip")}
                 </Button>
               </div>
             </CardBody>
@@ -546,27 +430,26 @@ export default function Home() {
 
             <div className="absolute left-5 right-5 top-5 flex flex-wrap gap-3">
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                Inspiration first
+                {t("home.visual.inspirationFirst")}
               </span>
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                AI planning
+                {t("home.visual.aiPlanning")}
               </span>
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                Premium UX
+                {t("home.visual.premiumUX")}
               </span>
             </div>
 
             <div className="absolute bottom-5 left-5 right-5">
               <div className="max-w-xl rounded-3xl border border-white/15 bg-white/10 p-5 text-white backdrop-blur-md">
                 <div className="text-sm font-semibold uppercase tracking-wide text-white/80">
-                  Visual experience
+                  {t("home.visual.visualExperience")}
                 </div>
                 <div className="mt-2 text-2xl font-black">
-                  Inspire the trip before generating the journey
+                  {t("home.visual.title")}
                 </div>
                 <div className="mt-2 text-sm leading-6 text-white/85">
-                  The homepage now feels more like a premium planning product and less
-                  like a generic booking website.
+                  {t("home.visual.description")}
                 </div>
               </div>
             </div>
@@ -584,14 +467,13 @@ export default function Home() {
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur">
-              Ready to begin?
+              {t("home.cta.badge")}
             </div>
             <h3 className="mt-4 text-3xl font-black tracking-tight">
-              Start planning your next unforgettable journey
+              {t("home.cta.title")}
             </h3>
             <p className="mt-2 text-sm leading-7 text-white/80 sm:text-base">
-              Choose a destination, shape the travel style, and generate a smarter
-              itinerary with a homepage that truly fits your project.
+              {t("home.cta.description")}
             </p>
           </div>
 
@@ -601,7 +483,7 @@ export default function Home() {
               onClick={() => nav("/create")}
             >
               <PlaneTakeoff size={16} />
-              Create Trip
+              {t("home.cta.createTrip")}
             </Button>
 
             <Button
@@ -609,7 +491,7 @@ export default function Home() {
               className="w-full border-white/20 bg-white/10 text-white hover:bg-white/15 sm:w-auto"
               onClick={() => nav("/trips")}
             >
-              My Trips
+              {t("home.cta.myTrips")}
             </Button>
           </div>
         </div>
@@ -618,7 +500,7 @@ export default function Home() {
   );
 }
 
-function PhotoCard({ src, badge, className = "" }) {
+function PhotoCard({ src, badge, caption, className = "" }) {
   return (
     <div
       className={cx(
@@ -640,7 +522,7 @@ function PhotoCard({ src, badge, className = "" }) {
       </div>
       <div className="absolute bottom-3 left-3 right-3">
         <div className="rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white/95 backdrop-blur">
-          Inspiring places, smarter planning
+          {caption}
         </div>
       </div>
     </div>

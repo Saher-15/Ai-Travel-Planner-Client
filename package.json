@@ -14,6 +14,7 @@
     "@maptiler/sdk": "^3.11.1",
     "axios": "^1.13.6",
     "html2canvas": "^1.4.1",
+    "i18next": "^25.8.18",
     "jspdf": "^4.2.0",
     "leaflet": "^1.9.4",
     "leaflet-routing-machine": "^3.2.12",
@@ -21,6 +22,7 @@
     "mapbox-gl": "^3.19.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-i18next": "^16.5.8",
     "react-leaflet": "^5.0.0",
     "react-map-gl": "^8.1.0",
     "react-router-dom": "^7.13.1"

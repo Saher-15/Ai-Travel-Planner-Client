@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import {
   Alert,
@@ -10,6 +11,7 @@ import {
 } from "../components/UI.jsx";
 
 export default function AdminContacts() {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState(null);
@@ -28,7 +30,7 @@ export default function AdminContacts() {
         type: "error",
         text:
           err?.response?.data?.message ||
-          "Failed to load messages",
+          t("adminContacts.loadFailed"),
       });
     } finally {
       setLoading(false);
@@ -48,7 +50,7 @@ export default function AdminContacts() {
         type: "error",
         text:
           err?.response?.data?.message ||
-          "Failed to mark message as read",
+          t("adminContacts.markReadFailed"),
       });
     }
   }
@@ -57,7 +59,7 @@ export default function AdminContacts() {
     const adminReply = String(replyDrafts[id] || "").trim();
 
     if (!adminReply) {
-      setMsg({ type: "error", text: "Please write a reply first." });
+      setMsg({ type: "error", text: t("adminContacts.writeReply") });
       return;
     }
 
@@ -83,13 +85,13 @@ export default function AdminContacts() {
       );
 
       setReplyDrafts((prev) => ({ ...prev, [id]: "" }));
-      setMsg({ type: "success", text: "Reply saved successfully." });
+      setMsg({ type: "success", text: t("adminContacts.replySaved") });
     } catch (err) {
       setMsg({
         type: "error",
         text:
           err?.response?.data?.message ||
-          "Failed to send reply",
+          t("adminContacts.replyFailed"),
       });
     } finally {
       setReplyingId("");
@@ -105,7 +107,7 @@ export default function AdminContacts() {
         type: "error",
         text:
           err?.response?.data?.message ||
-          "Failed to delete message",
+          t("adminContacts.deleteFailed"),
       });
     }
   }
@@ -118,11 +120,11 @@ export default function AdminContacts() {
     <div className="space-y-6">
       <Card>
         <CardHeader
-          title="Contact Messages"
-          subtitle="Admin page for support messages and replies"
+          title={t("adminContacts.title")}
+          subtitle={t("adminContacts.subtitle")}
           right={
             <Button variant="secondary" onClick={loadMessages} disabled={loading}>
-              Refresh
+              {t("adminContacts.refresh")}
             </Button>
           }
         />
@@ -130,9 +132,9 @@ export default function AdminContacts() {
           {msg ? <Alert type={msg.type}>{msg.text}</Alert> : null}
 
           {loading ? (
-            <div className="text-sm text-slate-500">Loading messages...</div>
+            <div className="text-sm text-slate-500">{t("adminContacts.loading")}</div>
           ) : items.length === 0 ? (
-            <Alert type="info">No contact messages yet.</Alert>
+            <Alert type="info">{t("adminContacts.noMessages")}</Alert>
           ) : (
             <div className="space-y-4">
               {items.map((item) => (
@@ -155,21 +157,21 @@ export default function AdminContacts() {
                       <div className="flex flex-wrap items-center gap-2">
                         {item.isRead ? (
                           <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
-                            Read
+                            {t("adminContacts.read")}
                           </Badge>
                         ) : (
                           <Badge className="border-amber-200 bg-amber-50 text-amber-700">
-                            New
+                            {t("adminContacts.new")}
                           </Badge>
                         )}
 
                         {item.status === "replied" ? (
                           <Badge className="border-sky-200 bg-sky-50 text-sky-700">
-                            Replied
+                            {t("adminContacts.replied")}
                           </Badge>
                         ) : (
                           <Badge className="border-slate-200 bg-slate-100 text-slate-700">
-                            Pending
+                            {t("adminContacts.pending")}
                           </Badge>
                         )}
                       </div>
@@ -182,14 +184,14 @@ export default function AdminContacts() {
                     {item.adminReply ? (
                       <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
                         <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-                          Admin reply
+                          {t("adminContacts.adminReply")}
                         </div>
                         <div className="mt-2 text-sm leading-6 text-slate-700">
                           {item.adminReply}
                         </div>
                         {item.repliedAt ? (
                           <div className="mt-2 text-xs text-slate-500">
-                            Replied at {new Date(item.repliedAt).toLocaleString()}
+                            {t("adminContacts.repliedAt", { date: new Date(item.repliedAt).toLocaleString() })}
                           </div>
                         ) : null}
                       </div>
@@ -197,7 +199,7 @@ export default function AdminContacts() {
 
                     <label className="block">
                       <div className="mb-1.5 text-sm font-semibold text-slate-700">
-                        {item.adminReply ? "Update reply" : "Write a reply"}
+                        {item.adminReply ? t("adminContacts.updateReply") : t("adminContacts.writeAReply")}
                       </div>
                       <textarea
                         rows={4}
@@ -208,7 +210,7 @@ export default function AdminContacts() {
                             [item._id]: e.target.value,
                           }))
                         }
-                        placeholder="Write your reply to the user..."
+                        placeholder={t("adminContacts.replyPlaceholder")}
                         className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
                       />
                     </label>
@@ -219,7 +221,7 @@ export default function AdminContacts() {
                           variant="secondary"
                           onClick={() => markAsRead(item._id)}
                         >
-                          Mark as Read
+                          {t("adminContacts.markAsRead")}
                         </Button>
                       ) : null}
 
@@ -228,17 +230,17 @@ export default function AdminContacts() {
                         disabled={replyingId === item._id}
                       >
                         {replyingId === item._id
-                          ? "Saving reply..."
+                          ? t("adminContacts.savingReply")
                           : item.adminReply
-                          ? "Update Reply"
-                          : "Send Reply"}
+                          ? t("adminContacts.updateReplyBtn")
+                          : t("adminContacts.sendReply")}
                       </Button>
 
                       <Button
                         variant="danger"
                         onClick={() => deleteMessage(item._id)}
                       >
-                        Delete
+                        {t("adminContacts.delete")}
                       </Button>
                     </div>
                   </CardBody>

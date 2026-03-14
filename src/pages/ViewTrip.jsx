@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import {
@@ -59,7 +60,7 @@ function buildPhotoQuery(item = {}, destination = "") {
     .trim();
 }
 
-function extractUniqueLocations(itinerary, destination = "") {
+function extractUniqueLocations(itinerary, destination = "", placeFallback = "Place") {
   const rows =
     itinerary?.days?.flatMap((d) =>
       BLOCKS.flatMap((block) =>
@@ -67,7 +68,7 @@ function extractUniqueLocations(itinerary, destination = "") {
           .map((a) => ({
             day: d.day,
             date: d.date,
-            title: a?.title || "Place",
+            title: a?.title || placeFallback,
             timeBlock: block,
             location: (a?.location || "").trim(),
             address: (a?.address || "").trim(),
@@ -123,6 +124,7 @@ function formatHours(value) {
 }
 
 function useAsync(fn, deps) {
+  const { t } = useTranslation();
   const [state, setState] = useState({ data: null, loading: true, error: "" });
 
   useEffect(() => {
@@ -142,7 +144,7 @@ function useAsync(fn, deps) {
               e?.response?.data?.message ||
               e?.response?.data?.details?.message ||
               e?.message ||
-              "Something went wrong",
+              t("viewTrip.somethingWentWrong"),
           });
         }
       }
@@ -235,16 +237,19 @@ function buildGoogleMapsUrl(place) {
 }
 
 function GoogleMapsButton({ place, className = "" }) {
+  const { t } = useTranslation();
   const url = buildGoogleMapsUrl(place);
 
   return (
     <a href={url} target="_blank" rel="noreferrer" className={className}>
-      Open in Google Maps
+      {t("viewTrip.openInGoogleMaps")}
     </a>
   );
 }
 
 export default function ViewTrip() {
+  const { t } = useTranslation();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -275,8 +280,8 @@ export default function ViewTrip() {
   }, [trip]);
 
   const locations = useMemo(
-    () => extractUniqueLocations(trip?.itinerary, primaryDestination),
-    [trip, primaryDestination]
+    () => extractUniqueLocations(trip?.itinerary, primaryDestination, t("viewTrip.place")),
+    [trip, primaryDestination, t]
   );
 
   const itineraryPhotosState = usePlacePhotos(locations, primaryDestination);
@@ -286,11 +291,11 @@ export default function ViewTrip() {
     () =>
       rawRecommendedPlaces.map((place) => ({
         ...place,
-        title: place?.title || place?.name || "Recommended Place",
+        title: place?.title || place?.name || t("viewTrip.recommendedPlace"),
         notes: place?.notes || place?.reason || "",
         photoQuery: buildPhotoQuery(place, primaryDestination),
       })),
-    [rawRecommendedPlaces, primaryDestination]
+    [rawRecommendedPlaces, primaryDestination, t]
   );
 
   const recommendedPhotosState = usePlacePhotos(
@@ -338,7 +343,7 @@ export default function ViewTrip() {
 
       const contentType = res?.headers?.["content-type"] || "";
       if (!contentType.includes("pdf")) {
-        throw new Error("Invalid PDF response");
+        throw new Error(t("viewTrip.failedDownloadPDF"));
       }
 
       const blob = new Blob([res.data], { type: "application/pdf" });
@@ -361,7 +366,7 @@ export default function ViewTrip() {
     } catch (err) {
       console.error("Download PDF error:", err);
       setDownloadError(
-        err?.response?.data?.message || err?.message || "Failed to download PDF."
+        err?.response?.data?.message || err?.message || t("viewTrip.failedDownloadPDF")
       );
     }
   };
@@ -374,10 +379,10 @@ export default function ViewTrip() {
         <Alert type="error">{tripState.error}</Alert>
         <div className="flex gap-2">
           <Button onClick={() => nav("/trips")} variant="secondary">
-            Back
+            {t("viewTrip.back")}
           </Button>
           <Button onClick={() => nav("/create")} variant="ghost">
-            Create New
+            {t("viewTrip.createNew")}
           </Button>
         </div>
       </div>
@@ -442,20 +447,20 @@ export default function ViewTrip() {
         {!!trip?.itinerary?.tips?.length && (
           <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
             <CardHeader
-              title="Trip Tips"
-              subtitle="Helpful reminders for a smoother travel experience"
+              title={t("viewTrip.tripTips")}
+              subtitle={t("viewTrip.tripTipsSubtitle")}
             />
             <CardBody>
               <div className="grid gap-4 sm:grid-cols-2">
-                {trip.itinerary.tips.map((t, i) => (
+                {trip.itinerary.tips.map((tip, i) => (
                   <div
                     key={i}
                     className="rounded-3xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-4 text-sm leading-6 text-slate-700 shadow-sm"
                   >
                     <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-sky-600">
-                      Tip {i + 1}
+                      {t("viewTrip.tip", { index: i + 1 })}
                     </div>
-                    {t}
+                    {tip}
                   </div>
                 ))}
               </div>
@@ -488,6 +493,7 @@ function Header({
   onEdit,
   onDownload,
 }) {
+  const { t } = useTranslation();
   return (
     <Card className="relative overflow-hidden border-0 shadow-[0_24px_80px_-28px_rgba(37,99,235,0.55)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.10),transparent_24%)]" />
@@ -495,11 +501,11 @@ function Header({
         <div className="flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <div className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.25em] text-white/85">
-              {tripMode === "multi" ? "Multi-city itinerary" : "Smart travel plan"}
+              {tripMode === "multi" ? t("viewTrip.multiCityItinerary") : t("viewTrip.smartTravelPlan")}
             </div>
 
             <div className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
-              {trip?.destination || "Trip"}
+              {trip?.destination || t("viewTrip.trip")}
             </div>
 
             <div className="mt-2 text-sm text-white/85 sm:text-base">
@@ -523,31 +529,31 @@ function Header({
           <div className="flex flex-wrap gap-2 lg:max-w-md lg:justify-end">
             {summary.days ? (
               <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
-                {summary.days} days
+                {t("viewTrip.days", { count: summary.days })}
               </Badge>
             ) : null}
 
             {tripMode === "multi" ? (
               <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
-                {destinations.length} cities
+                {t("viewTrip.cities", { count: destinations.length })}
               </Badge>
             ) : null}
 
             {summary.style ? (
               <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
-                pace: {summary.style}
+                {t("viewTrip.pace", { pace: summary.style })}
               </Badge>
             ) : null}
 
             {summary.budget ? (
               <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
-                budget: {summary.budget}
+                {t("viewTrip.budget", { budget: summary.budget })}
               </Badge>
             ) : null}
 
             {!!trip?.events?.length ? (
               <Badge className="border-white/20 bg-white/10 text-white shadow-sm">
-                {trip.events.length} events
+                {t("viewTrip.events", { count: trip.events.length })}
               </Badge>
             ) : null}
           </div>
@@ -555,7 +561,7 @@ function Header({
 
         <div className="relative z-10 flex flex-wrap gap-3 px-6 pb-7 sm:px-8">
           <Button type="button" onClick={onBack} variant="secondary">
-            ← Back to My Trips
+            {t("viewTrip.back")}
           </Button>
 
           <Button
@@ -564,7 +570,7 @@ function Header({
             variant="secondary"
             className="bg-white/15 text-white backdrop-blur hover:bg-white/20"
           >
-            ✏️ Edit Trip
+            {t("viewTrip.editTrip")}
           </Button>
 
           <Button
@@ -573,7 +579,7 @@ function Header({
             variant="ghost"
             className="bg-white/10 text-white backdrop-blur hover:bg-white/15"
           >
-            ＋ Create New
+            {t("viewTrip.createNew")}
           </Button>
 
           <Button
@@ -585,7 +591,7 @@ function Header({
               onDownload?.();
             }}
           >
-            ⬇ Download PDF
+            {t("viewTrip.downloadPDF")}
           </Button>
         </div>
       </div>
@@ -602,6 +608,7 @@ function TripOverview({
   totalHours,
   placeCount,
 }) {
+  const { t } = useTranslation();
   const preferences = trip?.preferences || {};
   const interests = Array.isArray(preferences?.interests)
     ? preferences.interests
@@ -610,48 +617,48 @@ function TripOverview({
   return (
     <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
-        title="Trip Overview"
-        subtitle="A quick summary of the trip settings and preferences"
+        title={t("viewTrip.tripOverview")}
+        subtitle={t("viewTrip.tripOverviewSubtitle")}
       />
       <CardBody className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <FancyInfoTile
-            label={tripMode === "multi" ? "Trip mode" : "Destination"}
-            value={tripMode === "multi" ? "Multi-city" : trip?.destination || "—"}
+            label={tripMode === "multi" ? t("viewTrip.tripMode") : t("viewTrip.destination")}
+            value={tripMode === "multi" ? t("viewTrip.multiCity") : trip?.destination || "—"}
             icon="🌍"
           />
           <FancyInfoTile
-            label="Dates"
+            label={t("viewTrip.dates")}
             value={fmtRange(trip?.startDate, trip?.endDate) || "—"}
             icon="📅"
           />
           <FancyInfoTile
-            label="Pace"
+            label={t("viewTrip.pace_label")}
             value={summary?.style || preferences?.pace || "—"}
             icon="⚡"
           />
           <FancyInfoTile
-            label="Budget"
+            label={t("viewTrip.budget_label")}
             value={summary?.budget || preferences?.budget || "—"}
             icon="💳"
           />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <FancyInfoTile label="Activities" value={totalActivities || "0"} icon="🧭" />
+          <FancyInfoTile label={t("viewTrip.activities")} value={totalActivities || "0"} icon="🧭" />
           <FancyInfoTile
-            label="Estimated Hours"
+            label={t("viewTrip.estimatedHours")}
             value={formatHours(totalHours)}
             icon="⏱️"
           />
-          <FancyInfoTile label="Events" value={trip?.events?.length || "0"} icon="🎟️" />
-          <FancyInfoTile label="Places" value={placeCount || "0"} icon="📍" />
+          <FancyInfoTile label={t("viewTrip.events_label")} value={trip?.events?.length || "0"} icon="🎟️" />
+          <FancyInfoTile label={t("viewTrip.places")} value={placeCount || "0"} icon="📍" />
         </div>
 
         {tripMode === "multi" && destinations.length > 1 ? (
           <div className="rounded-3xl border border-slate-200 bg-linear-to-r from-sky-50 to-indigo-50 p-5">
             <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-              Cities in this trip
+              {t("viewTrip.citiesInTrip")}
             </div>
             <div className="mt-4 flex flex-wrap gap-2.5">
               {destinations.map((city) => (
@@ -669,7 +676,7 @@ function TripOverview({
         {!!interests.length && (
           <div>
             <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-              Interests
+              {t("viewTrip.interests")}
             </div>
             <div className="flex flex-wrap gap-2.5">
               {interests.map((item) => (
@@ -687,7 +694,7 @@ function TripOverview({
         {preferences?.notes ? (
           <div className="rounded-3xl border border-slate-200 bg-linear-to-br from-white to-slate-50 p-5 shadow-sm">
             <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-              Notes
+              {t("viewTrip.notes")}
             </div>
             <div className="mt-3 text-sm leading-7 text-slate-700">
               {preferences.notes}
@@ -700,6 +707,7 @@ function TripOverview({
 }
 
 function CityPlanSection({ summary, tripMode, destinations }) {
+  const { t } = useTranslation();
   const cityPlan = Array.isArray(summary?.cityPlan) ? summary.cityPlan : [];
 
   if (tripMode !== "multi" || !destinations.length) return null;
@@ -707,9 +715,9 @@ function CityPlanSection({ summary, tripMode, destinations }) {
   return (
     <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
-        title="City Plan"
-        subtitle="How your days are distributed across the cities in this trip"
-        right={<Badge className="bg-sky-50 text-sky-700">{destinations.length} cities</Badge>}
+        title={t("viewTrip.cityPlan")}
+        subtitle={t("viewTrip.cityPlanSubtitle")}
+        right={<Badge className="bg-sky-50 text-sky-700">{t("viewTrip.cities", { count: destinations.length })}</Badge>}
       />
       <CardBody>
         {cityPlan.length ? (
@@ -720,13 +728,13 @@ function CityPlanSection({ summary, tripMode, destinations }) {
                 className="rounded-3xl border border-slate-200 bg-linear-to-br from-white to-indigo-50/60 p-5 shadow-sm"
               >
                 <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                  City {index + 1}
+                  {t("viewTrip.city", { index: index + 1 })}
                 </div>
                 <div className="mt-2 text-lg font-extrabold tracking-tight text-slate-900">
                   {segment.city}
                 </div>
                 <div className="mt-3 inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
-                  {segment.days} day{segment.days > 1 ? "s" : ""}
+                  {segment.days} {t("viewTrip.day")}{segment.days > 1 ? "s" : ""}
                 </div>
                 <div className="mt-3 text-sm text-slate-600">
                   {fmtRange(segment.startDate, segment.endDate)}
@@ -735,7 +743,7 @@ function CityPlanSection({ summary, tripMode, destinations }) {
             ))}
           </div>
         ) : (
-          <SoftMessage>This is a multi-city trip with {destinations.length} cities.</SoftMessage>
+          <SoftMessage>{t("viewTrip.multiCityTrip", { count: destinations.length })}</SoftMessage>
         )}
       </CardBody>
     </Card>
@@ -743,22 +751,23 @@ function CityPlanSection({ summary, tripMode, destinations }) {
 }
 
 function RecommendedPlacesSection({ places, onJump, loading }) {
+  const { t } = useTranslation();
   if (!places?.length && !loading) return null;
 
   return (
     <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
-        title="Recommended Places"
-        subtitle="Special places selected for your trip"
+        title={t("viewTrip.recommendedPlaces")}
+        subtitle={t("viewTrip.recommendedPlacesSubtitle")}
         right={
           !loading ? (
-            <Badge className="bg-sky-50 text-sky-700">{places.length} places</Badge>
+            <Badge className="bg-sky-50 text-sky-700">{t("viewTrip.placesCount", { count: places.length })}</Badge>
           ) : null
         }
       />
       <CardBody>
         {loading && !places?.length ? (
-          <SoftMessage>Loading recommended place photos...</SoftMessage>
+          <SoftMessage>{t("viewTrip.loadingPlacePhotos")}</SoftMessage>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {places.map((place, i) => {
@@ -767,7 +776,7 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
                 place?.name ||
                 place?.placeName ||
                 place?.location ||
-                "Recommended Place";
+                t("viewTrip.recommendedPlace");
 
               const image =
                 place?.photoUrl ||
@@ -802,7 +811,7 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center bg-linear-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
-                        No photo available
+                        {t("viewTrip.noPhotoAvailable")}
                       </div>
                     )}
 
@@ -810,7 +819,7 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
 
                     {dayNumber ? (
                       <div className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
-                        Day {dayNumber}
+                        {t("viewTrip.dayLabel", { number: dayNumber })}
                       </div>
                     ) : null}
                   </div>
@@ -864,7 +873,7 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
                           className="text-xs"
                           onClick={() => onJump?.(dayNumber)}
                         >
-                          Go to Day {dayNumber}
+                          {t("viewTrip.goToDay", { number: dayNumber })}
                         </Button>
                       ) : null}
                     </div>              
@@ -880,10 +889,11 @@ function RecommendedPlacesSection({ places, onJump, loading }) {
 }
 
 function EventsSection({ events }) {
+  const { t } = useTranslation();
   if (!events?.length) return null;
 
   const grouped = events.reduce((acc, event) => {
-    const key = event?.date || "Unknown date";
+    const key = event?.date || t("viewTrip.unknownDate");
     if (!acc[key]) acc[key] = [];
     acc[key].push(event);
     return acc;
@@ -894,9 +904,9 @@ function EventsSection({ events }) {
   return (
     <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
-        title="Events During Your Trip"
-        subtitle="Local events, parties, concerts, and activities matching your trip dates"
-        right={<Badge className="bg-sky-50 text-sky-700">{events.length} events</Badge>}
+        title={t("viewTrip.eventsTitle")}
+        subtitle={t("viewTrip.eventsSubtitle")}
+        right={<Badge className="bg-sky-50 text-sky-700">{t("viewTrip.events", { count: events.length })}</Badge>}
       />
       <CardBody className="space-y-6">
         {orderedDates.map((dateKey) => (
@@ -913,14 +923,14 @@ function EventsSection({ events }) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="text-base font-extrabold tracking-tight text-slate-900">
-                      {event.name || "Event"}
+                      {event.name || t("viewTrip.event")}
                     </div>
 
                     {event.category ? <Tag color="sky">{event.category}</Tag> : null}
                   </div>
 
                   <div className="mt-3 text-xs font-medium text-slate-500">
-                    {event.time || "Time not specified"}
+                    {event.time || t("viewTrip.timeNotSpecified")}
                   </div>
 
                   {event.location ? (
@@ -960,7 +970,7 @@ function EventsSection({ events }) {
                         rel="noreferrer"
                         className="text-xs font-bold text-sky-700 transition hover:text-sky-800"
                       >
-                        View event →
+                        {t("viewTrip.viewEvent")}
                       </a>
                     ) : null}
                   </div>
@@ -975,22 +985,23 @@ function EventsSection({ events }) {
 }
 
 function PlacesGallery({ points, loading }) {
+  const { t } = useTranslation();
   if (!points?.length && !loading) return null;
 
   return (
     <Card className="overflow-hidden border border-slate-200/80 bg-white/90 shadow-[0_20px_60px_-24px_rgba(15,23,42,0.25)] backdrop-blur">
       <CardHeader
-        title="Places from your itinerary"
-        subtitle="Places from your itinerary with photos and locations"
+        title={t("viewTrip.placesGallery")}
+        subtitle={t("viewTrip.placesGallerySubtitle")}
         right={
           !loading ? (
-            <Badge className="bg-sky-50 text-sky-700">{points.length} places</Badge>
+            <Badge className="bg-sky-50 text-sky-700">{t("viewTrip.placesCount", { count: points.length })}</Badge>
           ) : null
         }
       />
       <CardBody>
         {loading && !points?.length ? (
-          <SoftMessage>Loading place photos...</SoftMessage>
+          <SoftMessage>{t("viewTrip.loadingPlacePhotosGallery")}</SoftMessage>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {points.map((place, i) => {
@@ -1010,21 +1021,21 @@ function PlacesGallery({ points, loading }) {
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center bg-linear-to-br from-slate-100 to-slate-200 text-sm font-medium text-slate-500">
-                        No photo available
+                        {t("viewTrip.noPhotoAvailable")}
                       </div>
                     )}
 
                     <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-t from-black/55 to-transparent" />
 
                     <div className="absolute left-3 top-3 rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
-                      Day {place.day} • {place.timeBlock}
+                      {t("viewTrip.dayTimeBlock", { day: place.day, timeBlock: place.timeBlock })}
                     </div>
                   </div>
 
                   <div className="space-y-4 p-5">
                     <div>
                       <div className="text-lg font-extrabold tracking-tight text-slate-900">
-                        {place.title || "Place"}
+                        {place.title || t("viewTrip.place")}
                       </div>
 
                       {place?.location ? (
@@ -1076,6 +1087,7 @@ function PlacesGallery({ points, loading }) {
 }
 
 function DayCard({ day, isOpen, onToggle }) {
+  const { t } = useTranslation();
   const activityCount = countDayActivities(day);
   const totalHours = getDayEstimatedHours(day);
 
@@ -1089,7 +1101,7 @@ function DayCard({ day, isOpen, onToggle }) {
         <div className="relative flex items-start justify-between gap-4">
           <div>
             <div className="text-xs font-bold uppercase tracking-[0.25em] text-white/70">
-              Day {day.day}
+              {t("viewTrip.dayLabel", { number: day.day })}
             </div>
             <div className="mt-2 text-2xl font-black tracking-tight leading-snug">
               {day.title}
@@ -1099,7 +1111,7 @@ function DayCard({ day, isOpen, onToggle }) {
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Badge className="border-white/20 bg-white/10 text-white">
-              {activityCount} activities
+              {t("viewTrip.activitiesCount", { count: activityCount })}
             </Badge>
             <Badge className="border-white/20 bg-white/10 text-white">
               {formatHours(totalHours)}
@@ -1110,7 +1122,7 @@ function DayCard({ day, isOpen, onToggle }) {
               className="bg-white/15 text-white backdrop-blur hover:bg-white/20"
               onClick={onToggle}
             >
-              {isOpen ? "Collapse" : "Expand"}
+              {isOpen ? t("viewTrip.collapse") : t("viewTrip.expand")}
             </Button>
           </div>
         </div>
@@ -1118,22 +1130,22 @@ function DayCard({ day, isOpen, onToggle }) {
 
       {isOpen ? (
         <CardBody className="space-y-1">
-          <MiniSection title="Morning" items={day.morning} icon="☀️" />
-          <MiniSection title="Afternoon" items={day.afternoon} icon="🌤️" />
-          <MiniSection title="Evening" items={day.evening} icon="🌙" />
+          <MiniSection title={t("viewTrip.morning")} items={day.morning} icon="☀️" />
+          <MiniSection title={t("viewTrip.afternoon")} items={day.afternoon} icon="🌤️" />
+          <MiniSection title={t("viewTrip.evening")} items={day.evening} icon="🌙" />
 
           {(day.foodSuggestion || day.backupPlan) && (
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               {day.foodSuggestion ? (
                 <FancyInfoTile
-                  label="Food Suggestion"
+                  label={t("viewTrip.foodSuggestion")}
                   value={clamp(day.foodSuggestion)}
                   icon="🍽️"
                 />
               ) : null}
               {day.backupPlan ? (
                 <FancyInfoTile
-                  label="Backup Plan"
+                  label={t("viewTrip.backupPlan")}
                   value={clamp(day.backupPlan)}
                   icon="🛟"
                 />
@@ -1186,6 +1198,7 @@ function FancyInfoTile({ label, value, icon }) {
 }
 
 function MiniSection({ title, items, icon }) {
+  const { t } = useTranslation();
   if (!items?.length) return null;
 
   return (
@@ -1196,7 +1209,7 @@ function MiniSection({ title, items, icon }) {
           {title}
         </div>
         <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
-          {items.length} item{items.length > 1 ? "s" : ""}
+          {items.length > 1 ? t("viewTrip.items", { count: items.length }) : t("viewTrip.item", { count: items.length })}
         </div>
       </div>
 
